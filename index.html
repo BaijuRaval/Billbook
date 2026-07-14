@@ -22,6 +22,13 @@
         createUserWithEmailAndPassword,
         signOut
       } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+      import {
+        getFirestore,
+        doc,
+        setDoc,
+        getDoc,
+        serverTimestamp
+      } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyC3rdFLymcNpe7TwWLlhM9PLKi-nIDi-n0",
@@ -36,6 +43,8 @@
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
       const auth = getAuth(app);
+      const db = getFirestore(app);
+      let currentUser = null;
 
       function friendlyAuthError(code) {
         const map = {
@@ -98,12 +107,62 @@
         signOut(auth);
       };
 
+      window.backupToCloud = async function () {
+        if (!currentUser) {
+          alert('Please sign in first.');
+          return;
+        }
+        const btn = document.getElementById('backup-btn');
+        const payload = window.getBackupPayload();
+        try {
+          if (btn) btn.disabled = true;
+          await setDoc(doc(db, 'billbook_users', currentUser.uid), {
+            bills: payload.bills,
+            shopSettings: payload.shopSettings,
+            updatedAt: serverTimestamp()
+          });
+          alert('Backup completed successfully.');
+        } catch (err) {
+          alert('Backup failed: ' + err.message);
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      };
+
+      window.restoreFromCloud = async function () {
+        if (!currentUser) {
+          alert('Please sign in first.');
+          return;
+        }
+        if (!confirm('This will replace your current local data with the cloud backup. Continue?')) return;
+        const btn = document.getElementById('restore-btn');
+        try {
+          if (btn) btn.disabled = true;
+          const snap = await getDoc(doc(db, 'billbook_users', currentUser.uid));
+          if (!snap.exists()) {
+            alert('No cloud backup found for this account.');
+            return;
+          }
+          const data = snap.data();
+          window.applyRestoredData({ bills: data.bills || [], shopSettings: data.shopSettings || null });
+          alert('Restore completed successfully.');
+        } catch (err) {
+          alert('Restore failed: ' + err.message);
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      };
+
       onAuthStateChanged(auth, (user) => {
         const authScreen = document.getElementById('auth-screen');
         if (!authScreen) return;
         if (user) {
+          currentUser = user;
           authScreen.classList.add('hidden');
+          const emailEl = document.getElementById('account-email');
+          if (emailEl) emailEl.innerText = user.email || '—';
         } else {
+          currentUser = null;
           authScreen.classList.remove('hidden');
           const emailInput = document.getElementById('auth-email');
           const passwordInput = document.getElementById('auth-password');
@@ -1103,6 +1162,19 @@
                         </div>
                     </div>
 
+                    <div class="card-panel">
+                        <p class="card-panel-title">Cloud Backup</p>
+                        <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Signed in as <strong id="account-email">—</strong></p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button type="button" id="backup-btn" onclick="window.backupToCloud()" class="btn-action btn-pdf btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">cloud_upload</span> Backup
+                            </button>
+                            <button type="button" id="restore-btn" onclick="window.restoreFromCloud()" class="btn-action btn-edit btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">cloud_download</span> Restore
+                            </button>
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn-submit">
                         <span class="material-icons-round">save</span> Save Configuration
                     </button>
@@ -1222,6 +1294,20 @@
             document.getElementById('shop-name').value = shopSettings.name;
             document.getElementById('shop-address').value = shopSettings.address;
             document.getElementById('shop-phone').value = shopSettings.phone;
+        }
+
+        // --- Bridge functions for the Firestore backup/restore module script ---
+        function getBackupPayload() {
+            return { bills, shopSettings };
+        }
+
+        function applyRestoredData(data) {
+            bills = Array.isArray(data.bills) ? data.bills : [];
+            if (data.shopSettings) shopSettings = data.shopSettings;
+            localStorage.setItem('bills', JSON.stringify(bills));
+            localStorage.setItem('billbook_settings', JSON.stringify(shopSettings));
+            initShopSettingsForm();
+            renderBillsList();
         }
 
         function generateBillNumber() {
