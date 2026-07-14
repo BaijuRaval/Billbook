@@ -997,20 +997,66 @@
             justify-content: center;
         }
 
-        /* --- App Loader (shown while Firebase resolves auth state) --- */
+        /* --- App Splash Screen (shown while Firebase resolves auth state) --- */
         #app-loader {
             z-index: 400;
             align-items: center;
             justify-content: center;
+            background: var(--primary-gradient);
+            gap: 20px;
         }
 
-        .loader-spinner {
-            width: 40px;
-            height: 40px;
+        .splash-logo {
+            width: 88px;
+            height: 88px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.16);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            animation: splashPulse 1.6s ease-in-out infinite;
+        }
+
+        .splash-logo .material-icons-round {
+            font-size: 44px;
+            color: #FFFFFF;
+        }
+
+        .splash-text {
+            text-align: center;
+        }
+
+        .splash-title {
+            font-size: 26px;
+            font-weight: 900;
+            color: #FFFFFF;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+
+        .splash-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.85);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 6px;
+        }
+
+        .splash-spinner {
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
-            border: 4px solid var(--primary-container);
-            border-top-color: var(--primary);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #FFFFFF;
             animation: spin 0.8s linear infinite;
+            margin-top: 12px;
+        }
+
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
         }
 
         @keyframes spin {
@@ -1221,9 +1267,16 @@
             </div>
         </div>
 
-        <!-- APP LOADER (shown while Firebase resolves auth state) -->
+        <!-- APP SPLASH SCREEN (shown while Firebase resolves auth state) -->
         <div id="app-loader" class="full-screen-overlay">
-            <div class="loader-spinner"></div>
+            <div class="splash-logo">
+                <span class="material-icons-round">receipt_long</span>
+            </div>
+            <div class="splash-text">
+                <h1 class="splash-title">BillBook</h1>
+                <p class="splash-subtitle">Smart Invoicing</p>
+            </div>
+            <div class="splash-spinner"></div>
         </div>
 
         <!-- AUTH SCREEN (Login / Signup Gate, shown on load until signed in) -->
