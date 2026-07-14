@@ -109,7 +109,7 @@
 
       window.backupToCloud = async function () {
         if (!currentUser) {
-          alert('Please sign in first.');
+          await window.showAppAlert('Please sign in first.', { icon: 'lock_outline' });
           return;
         }
         const btn = document.getElementById('backup-btn');
@@ -121,9 +121,9 @@
             shopSettings: payload.shopSettings,
             updatedAt: serverTimestamp()
           });
-          alert('Backup completed successfully.');
+          await window.showAppAlert('Backup completed successfully.', { icon: 'cloud_done' });
         } catch (err) {
-          alert('Backup failed: ' + err.message);
+          await window.showAppAlert('Backup failed: ' + err.message, { icon: 'error_outline', danger: true });
         } finally {
           if (btn) btn.disabled = false;
         }
@@ -131,23 +131,27 @@
 
       window.restoreFromCloud = async function () {
         if (!currentUser) {
-          alert('Please sign in first.');
+          await window.showAppAlert('Please sign in first.', { icon: 'lock_outline' });
           return;
         }
-        if (!confirm('This will replace your current local data with the cloud backup. Continue?')) return;
+        const confirmed = await window.showAppConfirm('This will replace your current local data with the cloud backup. Continue?', {
+          icon: 'cloud_download',
+          confirmLabel: 'Restore'
+        });
+        if (!confirmed) return;
         const btn = document.getElementById('restore-btn');
         try {
           if (btn) btn.disabled = true;
           const snap = await getDoc(doc(db, 'billbook_users', currentUser.uid));
           if (!snap.exists()) {
-            alert('No cloud backup found for this account.');
+            await window.showAppAlert('No cloud backup found for this account.', { icon: 'cloud_off' });
             return;
           }
           const data = snap.data();
           window.applyRestoredData({ bills: data.bills || [], shopSettings: data.shopSettings || null });
-          alert('Restore completed successfully.');
+          await window.showAppAlert('Restore completed successfully.', { icon: 'check_circle' });
         } catch (err) {
-          alert('Restore failed: ' + err.message);
+          await window.showAppAlert('Restore failed: ' + err.message, { icon: 'error_outline', danger: true });
         } finally {
           if (btn) btn.disabled = false;
         }
@@ -997,6 +1001,101 @@
             justify-content: center;
         }
 
+        /* --- App-Native Alert / Confirm Modal --- */
+        .app-modal-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: rgba(15, 14, 23, 0.55);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .app-modal-card {
+            background-color: var(--card-bg);
+            border-radius: 22px;
+            padding: 28px 24px 24px 24px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        .app-modal-icon-wrap {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px auto;
+        }
+
+        .app-modal-icon-wrap .material-icons-round {
+            font-size: 28px;
+            color: var(--primary);
+        }
+
+        .app-modal-icon-wrap.danger {
+            background-color: var(--danger-container);
+        }
+
+        .app-modal-icon-wrap.danger .material-icons-round {
+            color: var(--danger);
+        }
+
+        .app-modal-message {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--on-surface);
+            line-height: 1.5;
+            margin: 0 0 20px 0;
+        }
+
+        .app-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .app-modal-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .app-modal-btn-cancel {
+            background-color: #F1EEF5;
+            color: var(--on-surface-variant);
+        }
+
+        .app-modal-btn-cancel:active {
+            background-color: #E2DFE8;
+        }
+
+        .app-modal-btn-confirm {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: var(--shadow-md);
+        }
+
+        .app-modal-btn-confirm:active {
+            transform: scale(0.98);
+        }
+
+        .app-modal-btn-confirm.danger {
+            background: var(--danger);
+            box-shadow: none;
+        }
+
         /* --- App Splash Screen (shown while Firebase resolves auth state) --- */
         #app-loader {
             z-index: 400;
@@ -1326,6 +1425,20 @@
             <div class="home-pill"></div>
         </div>
 
+        <!-- APP-NATIVE ALERT / CONFIRM MODAL -->
+        <div id="app-modal-overlay" class="app-modal-overlay hidden">
+            <div class="app-modal-card">
+                <div id="app-modal-icon-wrap" class="app-modal-icon-wrap">
+                    <span id="app-modal-icon" class="material-icons-round">info</span>
+                </div>
+                <p id="app-modal-message" class="app-modal-message"></p>
+                <div class="app-modal-actions">
+                    <button id="app-modal-cancel-btn" type="button" class="app-modal-btn app-modal-btn-cancel hidden">Cancel</button>
+                    <button id="app-modal-confirm-btn" type="button" class="app-modal-btn app-modal-btn-confirm">OK</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- JavaScript Controllers -->
@@ -1351,6 +1464,48 @@
             } else {
                 window.signupUser();
             }
+        }
+
+        // --- App-Native Alert / Confirm (replaces browser alert()/confirm()) ---
+        function showAppModal(message, { icon = 'info', danger = false, showCancel = false, confirmLabel = 'OK', cancelLabel = 'Cancel' } = {}) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('app-modal-overlay');
+                const msgEl = document.getElementById('app-modal-message');
+                const iconEl = document.getElementById('app-modal-icon');
+                const iconWrap = document.getElementById('app-modal-icon-wrap');
+                const confirmBtn = document.getElementById('app-modal-confirm-btn');
+                const cancelBtn = document.getElementById('app-modal-cancel-btn');
+
+                msgEl.innerText = message;
+                iconEl.innerText = icon;
+                iconWrap.classList.toggle('danger', danger);
+                confirmBtn.innerText = confirmLabel;
+                confirmBtn.classList.toggle('danger', danger);
+                cancelBtn.innerText = cancelLabel;
+                cancelBtn.classList.toggle('hidden', !showCancel);
+
+                overlay.classList.remove('hidden');
+
+                function cleanup(result) {
+                    overlay.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    resolve(result);
+                }
+                function onConfirm() { cleanup(true); }
+                function onCancel() { cleanup(false); }
+
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+            });
+        }
+
+        function showAppAlert(message, options = {}) {
+            return showAppModal(message, { ...options, showCancel: false, confirmLabel: options.confirmLabel || 'OK' });
+        }
+
+        function showAppConfirm(message, options = {}) {
+            return showAppModal(message, { ...options, showCancel: true, confirmLabel: options.confirmLabel || 'Confirm', cancelLabel: options.cancelLabel || 'Cancel' });
         }
 
         let bills = JSON.parse(localStorage.getItem('bills')) || [];
@@ -1590,7 +1745,7 @@
 
         // --- Save and Configuration Logic ---
         // Sets up store settings internally inside client memory profiles
-        function saveSettings(e) {
+        async function saveSettings(e) {
             e.preventDefault();
             shopSettings = {
                 name: document.getElementById('shop-name').value.trim(),
@@ -1598,11 +1753,11 @@
                 phone: document.getElementById('shop-phone').value.trim()
             };
             localStorage.setItem('billbook_settings', JSON.stringify(shopSettings));
-            alert("Configuration settings updated successfully.");
+            await showAppAlert("Configuration settings updated successfully.", { icon: 'check_circle' });
             history.back();
         }
 
-        function saveBill(e) {
+        async function saveBill(e) {
             e.preventDefault();
 
             const names = document.querySelectorAll('.item-name');
@@ -1619,7 +1774,7 @@
             }
 
             if (items.length === 0) {
-                alert("Please declare at least one line item.");
+                await showAppAlert("Please declare at least one line item.", { icon: 'error_outline', danger: true });
                 return;
             }
 
@@ -1783,8 +1938,13 @@
             `;
         }
 
-        function deleteBill(id) {
-            if (confirm("Are you sure you want to permanently delete this invoice?")) {
+        async function deleteBill(id) {
+            const confirmed = await showAppConfirm("Are you sure you want to permanently delete this invoice?", {
+                icon: 'delete_outline',
+                danger: true,
+                confirmLabel: 'Delete'
+            });
+            if (confirmed) {
                 bills = bills.filter(b => b.id !== id);
                 localStorage.setItem('bills', JSON.stringify(bills));
                 history.back();
