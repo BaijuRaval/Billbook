@@ -182,22 +182,22 @@
     <style>
         /* --- CSS Custom Variables (Material 3 Specification) --- */
         :root {
-            --primary: #6C4CF1;
-            --primary-gradient: linear-gradient(135deg, #6C4CF1, #8B6EFA);
-            --primary-container: #EADDFF;
-            --on-primary-container: #21005D;
-            --secondary: #625B71;
-            --surface: #F8F7FC;
-            --surface-variant: #E7E0EC;
-            --on-surface: #1C1B1F;
-            --on-surface-variant: #49454F;
+            --primary: #063970;
+            --primary-gradient: linear-gradient(135deg, #063970, #1E81B0);
+            --primary-container: #ABDBE3;
+            --on-primary-container: #063970;
+            --secondary: #154C79;
+            --surface: #EEEEE4;
+            --surface-variant: #ECECE0;
+            --on-surface: #21130D;
+            --on-surface-variant: #4F4845;
             --card-bg: #FFFFFF;
-            --border-light: #ECE9F1;
-            --danger: #B3261E;
-            --danger-container: #F9DEDC;
-            --on-danger-container: #410E0B;
+            --border-light: #F1F1E9;
+            --danger: #873E23;
+            --danger-container: #F9E4DC;
+            --on-danger-container: #873E23;
             --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.04);
-            --shadow-md: 0 10px 30px rgba(108, 76, 241, 0.15);
+            --shadow-md: 0 10px 30px rgba(6, 57, 112, 0.15);
             --safe-area-bottom: env(safe-area-inset-bottom, 0px);
             --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -309,7 +309,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(108, 76, 241, 0.2);
+            box-shadow: 0 4px 15px rgba(6, 57, 112, 0.2);
         }
 
         .brand-logo .material-icons-round {
@@ -365,8 +365,8 @@
             width: 100%;
             padding: 12px 16px 12px 48px;
             border-radius: 28px;
-            border: 1px solid transparent;
-            background-color: #EFEFF5;
+            border: 1px solid #ABDBE3;
+            background-color: #F5F5EF;
             font-size: 14px;
             font-weight: 500;
             color: var(--on-surface);
@@ -376,7 +376,7 @@
         .search-container input:focus {
             background-color: #FFF;
             border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(108, 76, 241, 0.1);
+            box-shadow: 0 4px 12px rgba(6, 57, 112, 0.1);
             outline: none;
         }
 
@@ -462,11 +462,11 @@
 
         .form-control:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(108, 76, 241, 0.15);
+            box-shadow: 0 0 0 3px rgba(6, 57, 112, 0.15);
         }
 
         .form-control-readonly {
-            background-color: #F1F0F5;
+            background-color: #F5F5F0;
             color: #7A7980;
         }
 
@@ -605,7 +605,7 @@
         }
 
         .invoice-card:hover {
-            box-shadow: 0 6px 20px rgba(108, 76, 241, 0.06);
+            box-shadow: 0 6px 20px rgba(6, 57, 112, 0.06);
             transform: translateY(-2px);
         }
 
@@ -618,7 +618,7 @@
         .invoice-badge {
             font-size: 10px;
             font-weight: 800;
-            color: var(--primary);
+            color: #1E81B0;
             background-color: var(--primary-container);
             padding: 4px 10px;
             border-radius: 12px;
@@ -650,7 +650,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            border-top: 1px solid #F1EEF5;
+            border-top: 1px solid #F5F5EE;
             padding-top: 12px;
         }
 
@@ -694,16 +694,16 @@
         }
 
         .btn-pdf:active {
-            background-color: #D3C4EC;
+            background-color: #8FCFDA;
         }
 
         .btn-edit {
-            background-color: #F1EEF5;
+            background-color: #F5F5EE;
             color: var(--on-surface-variant);
         }
 
         .btn-edit:active {
-            background-color: #E2DFE8;
+            background-color: #EAEADD;
         }
 
         .btn-delete {
@@ -712,7 +712,7 @@
         }
 
         .btn-delete:active {
-            background-color: #F4C4C2;
+            background-color: #F4D0C2;
         }
 
         .btn-action:active {
@@ -722,7 +722,7 @@
         /* --- Standard Button Submissions --- */
         .btn-submit {
             width: 100%;
-            background: var(--primary-gradient);
+            background: linear-gradient(135deg, #E28743, #EAB676);
             color: white;
             border: none;
             border-radius: 16px;
@@ -740,7 +740,7 @@
 
         .btn-submit:active {
             transform: scale(0.98);
-            box-shadow: 0 4px 10px rgba(108, 76, 241, 0.1);
+            box-shadow: 0 4px 10px rgba(226, 135, 67, 0.25);
         }
 
         /* --- Strictly Locked Symmetrical Bottom Nav Bar (No floating offsets) --- */
@@ -823,7 +823,7 @@
 
         #fab-add:hover {
             transform: scale(1.05);
-            box-shadow: 0 12px 28px rgba(108, 76, 241, 0.3);
+            box-shadow: 0 12px 28px rgba(6, 57, 112, 0.3);
         }
 
         #fab-add:active {
@@ -918,7 +918,7 @@
         }
 
         .overlay-back-btn {
-            background-color: #EFEFF5;
+            background-color: #F5F5EF;
             border: none;
             cursor: pointer;
             color: var(--on-surface-variant);
@@ -973,7 +973,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 8px 0;
-            border-bottom: 1px solid #F1EEF5;
+            border-bottom: 1px solid #F5F5EE;
             font-size: 13px;
             gap: 12px;
         }
@@ -1014,7 +1014,7 @@
             font-weight: 600;
             color: var(--on-surface);
             padding: 8px 4px;
-            border-bottom: 1px solid #F8F7FC;
+            border-bottom: 1px solid #FBFBF8;
         }
 
         .view-items-table tbody tr:last-child td {
@@ -1027,7 +1027,7 @@
             align-items: center;
             margin-top: 8px;
             padding-top: 12px;
-            border-top: 1px solid #F1EEF5;
+            border-top: 1px solid #F5F5EE;
         }
 
         .view-action-bar {
@@ -1116,12 +1116,12 @@
         }
 
         .app-modal-btn-cancel {
-            background-color: #F1EEF5;
+            background-color: #F5F5EE;
             color: var(--on-surface-variant);
         }
 
         .app-modal-btn-cancel:active {
-            background-color: #E2DFE8;
+            background-color: #EAEADD;
         }
 
         .app-modal-btn-confirm {
@@ -1234,7 +1234,7 @@
                     </div>
                 </div>
 
-                <button onclick="navigateToSettings()" class="btn-close" style="background:#EFEFF5;border-radius:12px;">
+                <button onclick="navigateToSettings()" class="btn-close" style="background:#F5F5EF;border-radius:12px;">
                     <span class="material-icons-round">settings</span>
                 </button>
             </div>
@@ -1326,7 +1326,7 @@
                             </div>
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--on-surface-variant); padding-top: 12px; border-top: 1px solid #F1EEF5;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--on-surface-variant); padding-top: 12px; border-top: 1px solid #F5F5EE;">
                             <span>Subtotal:</span>
                             <span id="label-subtotal">₹0.00</span>
                         </div>
@@ -2111,7 +2111,7 @@
                             <p style="font-size: 13px; color: #64748b; margin: 2px 0 0 0; font-weight: 700;">Date: ${formatDate(bill.date)}</p>
                         </div>
                         <div style="text-align: right;">
-                            <h2 style="font-size: 18px; font-weight: 800; color: #6750A4; margin: 0 0 4px 0; text-transform: uppercase;">${shopSettings.name}</h2>
+                            <h2 style="font-size: 18px; font-weight: 800; color: #063970; margin: 0 0 4px 0; text-transform: uppercase;">${shopSettings.name}</h2>
                             <p style="font-size: 12px; color: #64748b; margin: 0 0 2px 0; font-weight: 500; width: 220px; line-height: 1.4;">${shopSettings.address}</p>
                             <p style="font-size: 12px; color: #0f172a; margin: 0; font-weight: 700;">Ph: ${shopSettings.phone}</p>
                         </div>
@@ -2148,7 +2148,7 @@
                             </tr>
                             <tr>
                                 <td style="text-align: left; padding: 2px 0;">Discount (${bill.discount}%):</td>
-                                <td style="text-align: right; padding: 2px 0; color: #ef4444;">-₹${discAmt.toFixed(2)}</td>
+                                <td style="text-align: right; padding: 2px 0; color: #873E23;">-₹${discAmt.toFixed(2)}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #f1f5f9;">
                                 <td style="text-align: left; padding: 2px 0; padding-bottom: 8px;">Tax (${bill.tax}%):</td>
@@ -2156,7 +2156,7 @@
                             </tr>
                             <tr style="font-size: 16px; font-weight: 900; color: #0f172a;">
                                 <td style="text-align: left; padding-top: 14px;">Grand Total:</td>
-                                <td style="text-align: right; padding-top: 14px; color: #6750A4;">₹${bill.grandTotal.toFixed(2)}</td>
+                                <td style="text-align: right; padding-top: 14px; color: #063970;">₹${bill.grandTotal.toFixed(2)}</td>
                             </tr>
                         </table>
                     </div>
