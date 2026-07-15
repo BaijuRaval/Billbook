@@ -1349,7 +1349,7 @@
                 <button type="button" onclick="history.back()" class="overlay-back-btn">
                     <span class="material-icons-round">arrow_back</span>
                 </button>
-                <h2 class="overlay-title">Shop Settings</h2>
+                <h2 class="overlay-title">Settings</h2>
             </div>
             <div class="overlay-body">
                 <form id="settings-form" onsubmit="saveSettings(event)">
@@ -1370,10 +1370,14 @@
                             <label class="form-label">Contact Number *</label>
                             <input type="text" id="shop-phone" required class="form-control">
                         </div>
+
+                        <button type="submit" class="btn-submit" style="margin-top: 4px;">
+                            <span class="material-icons-round">save</span> Save Configuration
+                        </button>
                     </div>
 
                     <div class="card-panel">
-                        <p class="card-panel-title">Cloud Backup</p>
+                        <p class="card-panel-title">User</p>
                         <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Signed in as <strong id="account-email">—</strong></p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <button type="button" id="backup-btn" onclick="window.backupToCloud()" class="btn-action btn-pdf btn-action-lg">
@@ -1383,16 +1387,12 @@
                                 <span class="material-icons-round" style="font-size: 16px;">cloud_download</span> Restore
                             </button>
                         </div>
+
+                        <button type="button" onclick="window.logoutUser()" class="btn-submit" style="background: var(--danger); box-shadow: none; margin-top: 16px;">
+                            <span class="material-icons-round">logout</span> Log Out
+                        </button>
                     </div>
-
-                    <button type="submit" class="btn-submit">
-                        <span class="material-icons-round">save</span> Save Configuration
-                    </button>
                 </form>
-
-                <button type="button" onclick="window.logoutUser()" class="btn-submit" style="background: var(--danger-container); color: var(--on-danger-container); box-shadow: none; margin-top: 12px;">
-                    <span class="material-icons-round">logout</span> Log Out
-                </button>
             </div>
         </div>
 
