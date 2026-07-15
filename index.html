@@ -1388,7 +1388,7 @@
                             </button>
                         </div>
 
-                        <button type="button" onclick="window.logoutUser()" class="btn-submit" style="background: var(--danger); box-shadow: none; margin-top: 16px;">
+                        <button type="button" onclick="confirmLogout()" class="btn-submit" style="background: var(--danger); box-shadow: none; margin-top: 16px;">
                             <span class="material-icons-round">logout</span> Log Out
                         </button>
                     </div>
@@ -1574,6 +1574,17 @@
 
         function showAppConfirm(message, options = {}) {
             return showAppModal(message, { ...options, showCancel: true, confirmLabel: options.confirmLabel || 'Confirm', cancelLabel: options.cancelLabel || 'Cancel' });
+        }
+
+        async function confirmLogout() {
+            const confirmed = await showAppConfirm("Are you sure you want to log out?", {
+                icon: 'logout',
+                danger: true,
+                confirmLabel: 'Log Out'
+            });
+            if (confirmed) {
+                window.logoutUser();
+            }
         }
 
         let bills = JSON.parse(localStorage.getItem('bills')) || [];
