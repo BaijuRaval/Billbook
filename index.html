@@ -1,11 +1,2203 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BillBook Pro</title>
+    <!-- Material Icons (Round Style) -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <!-- Google Font Roboto (Android baseline typography) -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- html2pdf.js for zero-failure in-memory PDF compilation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Firebase Authentication -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-analytics.js";
+      import {
+        getAuth,
+        onAuthStateChanged,
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+        signOut
+      } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+      import {
+        getFirestore,
+        doc,
+        setDoc,
+        getDoc,
+        serverTimestamp
+      } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyC3rdFLymcNpe7TwWLlhM9PLKi-nIDi-n0",
+        authDomain: "billbook-efe3f.firebaseapp.com",
+        projectId: "billbook-efe3f",
+        storageBucket: "billbook-efe3f.firebasestorage.app",
+        messagingSenderId: "601890572433",
+        appId: "1:601890572433:web:786e37690fd5fe0fe09730",
+        measurementId: "G-JTN29M9X65"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      let currentUser = null;
+
+      function friendlyAuthError(code) {
+        const map = {
+          'auth/invalid-email': 'Please enter a valid email address.',
+          'auth/user-not-found': 'No account found with this email.',
+          'auth/wrong-password': 'Incorrect password.',
+          'auth/invalid-credential': 'Incorrect email or password.',
+          'auth/email-already-in-use': 'An account already exists with this email.',
+          'auth/weak-password': 'Password must be at least 6 characters.',
+          'auth/missing-password': 'Please enter a password.',
+          'auth/too-many-requests': 'Too many attempts. Please try again later.'
+        };
+        return map[code] || 'Something went wrong. Please try again.';
+      }
+
+      function showAuthError(message) {
+        const el = document.getElementById('auth-error');
+        if (!el) return;
+        el.innerText = message;
+        el.classList.remove('hidden');
+      }
+
+      function clearAuthError() {
+        const el = document.getElementById('auth-error');
+        if (!el) return;
+        el.innerText = '';
+        el.classList.add('hidden');
+      }
+
+      function setAuthLoading(isLoading) {
+        const btn = document.getElementById('auth-submit-btn');
+        if (btn) btn.disabled = isLoading;
+      }
+
+      window.loginUser = function () {
+        clearAuthError();
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        setAuthLoading(true);
+        signInWithEmailAndPassword(auth, email, password)
+          .catch(err => showAuthError(friendlyAuthError(err.code)))
+          .finally(() => setAuthLoading(false));
+      };
+
+      window.signupUser = function () {
+        clearAuthError();
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        if (password.length < 6) {
+          showAuthError('Password must be at least 6 characters.');
+          return;
+        }
+        setAuthLoading(true);
+        createUserWithEmailAndPassword(auth, email, password)
+          .catch(err => showAuthError(friendlyAuthError(err.code)))
+          .finally(() => setAuthLoading(false));
+      };
+
+      window.logoutUser = function () {
+        signOut(auth);
+      };
+
+      window.backupToCloud = async function () {
+        if (!currentUser) {
+          await window.showAppAlert('Please sign in first.', { icon: 'lock_outline' });
+          return;
+        }
+        const btn = document.getElementById('backup-btn');
+        const payload = window.getBackupPayload();
+        try {
+          if (btn) btn.disabled = true;
+          await setDoc(doc(db, 'billbook_users', currentUser.uid), {
+            bills: payload.bills,
+            shopSettings: payload.shopSettings,
+            updatedAt: serverTimestamp()
+          });
+          await window.showAppAlert('Backup completed successfully.', { icon: 'cloud_done' });
+        } catch (err) {
+          await window.showAppAlert('Backup failed: ' + err.message, { icon: 'error_outline', danger: true });
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      };
+
+      window.restoreFromCloud = async function () {
+        if (!currentUser) {
+          await window.showAppAlert('Please sign in first.', { icon: 'lock_outline' });
+          return;
+        }
+        const confirmed = await window.showAppConfirm('This will replace your current local data with the cloud backup. Continue?', {
+          icon: 'cloud_download',
+          confirmLabel: 'Restore'
+        });
+        if (!confirmed) return;
+        const btn = document.getElementById('restore-btn');
+        try {
+          if (btn) btn.disabled = true;
+          const snap = await getDoc(doc(db, 'billbook_users', currentUser.uid));
+          if (!snap.exists()) {
+            await window.showAppAlert('No cloud backup found for this account.', { icon: 'cloud_off' });
+            return;
+          }
+          const data = snap.data();
+          window.applyRestoredData({ bills: data.bills || [], shopSettings: data.shopSettings || null });
+          await window.showAppAlert('Restore completed successfully.', { icon: 'check_circle' });
+        } catch (err) {
+          await window.showAppAlert('Restore failed: ' + err.message, { icon: 'error_outline', danger: true });
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      };
+
+      onAuthStateChanged(auth, (user) => {
+        const authScreen = document.getElementById('auth-screen');
+        const loader = document.getElementById('app-loader');
+        if (!authScreen) return;
+        if (user) {
+          currentUser = user;
+          authScreen.classList.add('hidden');
+          const emailEl = document.getElementById('account-email');
+          if (emailEl) emailEl.innerText = user.email || '—';
+        } else {
+          currentUser = null;
+          authScreen.classList.remove('hidden');
+          const emailInput = document.getElementById('auth-email');
+          const passwordInput = document.getElementById('auth-password');
+          if (emailInput) emailInput.value = '';
+          if (passwordInput) passwordInput.value = '';
+          clearAuthError();
+        }
+        if (loader) loader.classList.add('hidden');
+      });
+    </script>
+
+    <style>
+        /* --- CSS Custom Variables (Material 3 Specification) --- */
+        :root {
+            --primary: #6C4CF1;
+            --primary-gradient: linear-gradient(135deg, #6C4CF1, #8B6EFA);
+            --primary-container: #EADDFF;
+            --on-primary-container: #21005D;
+            --secondary: #625B71;
+            --surface: #F8F7FC;
+            --surface-variant: #E7E0EC;
+            --on-surface: #1C1B1F;
+            --on-surface-variant: #49454F;
+            --card-bg: #FFFFFF;
+            --border-light: #ECE9F1;
+            --danger: #B3261E;
+            --danger-container: #F9DEDC;
+            --on-danger-container: #410E0B;
+            --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 10px 30px rgba(108, 76, 241, 0.15);
+            --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+            --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* --- Global Resets & Safe Area Handling --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevents double scrolling bounce on mobile */
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #0F0E17;
+            background: radial-gradient(circle, #1E1B2E 0%, #0F0E17 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100%;
+            color: var(--on-surface);
+        }
+
+        /* --- Main PWA Mobile Shell Wrapper --- */
+        .app-shell {
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            height: 100dvh; /* Dynamic view height handles mobile URL bars and hides safely */
+            background-color: var(--surface);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Simulator Frame adjustments on desktop views */
+        @media (min-width: 768px) {
+            .app-shell {
+                height: 840px;
+                border-radius: 40px;
+                border: 8px solid #2A283E;
+            }
+        }
+
+        /* Status Bar Mock (Visible only on desktop frame) */
+        .status-bar-mock {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 28px 4px 28px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #7A7980;
+            background-color: var(--surface);
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        @media (min-width: 768px) {
+            .status-bar-mock {
+                display: flex;
+            }
+        }
+
+        .status-icons {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-icons .material-icons-round {
+            font-size: 15px;
+        }
+
+        /* --- Sticky Premium Header --- */
+        .app-header {
+            background-color: var(--surface);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+
+        .header-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(108, 76, 241, 0.2);
+        }
+
+        .brand-logo .material-icons-round {
+            color: white;
+            font-size: 22px;
+        }
+
+        .brand-title {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--on-surface);
+            letter-spacing: -0.5px;
+            line-height: 1;
+            margin: 0;
+        }
+
+        .brand-subtitle {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary);
+            margin-top: 4px;
+        }
+
+        .bill-counter {
+            font-size: 11px;
+            font-weight: 700;
+            background-color: var(--primary-container);
+            color: var(--on-primary-container);
+            padding: 6px 14px;
+            border-radius: 20px;
+        }
+
+        /* Search Bar */
+        .search-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--on-surface-variant);
+            font-size: 20px;
+            transition: var(--transition-smooth);
+        }
+
+        .search-container input {
+            box-sizing:border-box;
+            width: 100%;
+            padding: 12px 16px 12px 48px;
+            border-radius: 28px;
+            border: 1px solid transparent;
+            background-color: #EFEFF5;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--on-surface);
+            transition: var(--transition-smooth);
+        }
+
+        .search-container input:focus {
+            background-color: #FFF;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(108, 76, 241, 0.1);
+            outline: none;
+        }
+
+        .search-container input:focus + .search-icon {
+            color: var(--primary);
+        }
+
+        /* --- Scrollable Content Window Area --- */
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 16px 100px 16px; /* 100px bottom cushion prevents floating FAB blocking */
+        }
+
+        .content-area::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* --- Screens & Display Modifiers --- */
+        .hidden {
+            display: none !important;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        /* --- Structured Card Panels --- */
+        .card-panel {
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-soft);
+            margin-bottom: 16px;
+        }
+
+        .card-panel-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        /* --- Material Input & Form Fields --- */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--on-surface-variant);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            background-color: #FFF;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--on-surface);
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(108, 76, 241, 0.15);
+        }
+
+        .form-control-readonly {
+            background-color: #F1F0F5;
+            color: #7A7980;
+        }
+
+        /* --- Unified Screen Header --- */
+        .screen-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .screen-title {
+            font-size: 16px;
+            font-weight: 950;
+            color: var(--primary);
+            letter-spacing: -0.3px;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--on-surface-variant);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-smooth);
+            padding: 4px;
+            border-radius: 50%;
+        }
+
+        .btn-close:hover {
+            color: var(--primary);
+            background-color: var(--border-light);
+        }
+
+        /* --- Item Summary Rows (populated via Add Item modal) --- */
+        .item-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+        }
+
+        .item-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        .item-row-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-row-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--on-surface);
+            margin: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .item-row-meta {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--on-surface-variant);
+            margin-top: 2px;
+        }
+
+        .item-row-amount {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 0 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .item-row-empty {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+            text-align: center;
+            padding: 16px 0;
+            font-weight: 600;
+        }
+
+        .btn-delete-row {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--danger);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px;
+            border-radius: 8px;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-delete-row:active {
+            transform: scale(0.9);
+            background-color: var(--danger-container);
+        }
+
+        /* --- Dynamic Invoice List Cards --- */
+        .invoice-card {
+            background-color: var(--card-bg);
+            border-radius: 18px;
+            padding: 16px;
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-soft);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 14px;
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .invoice-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: var(--primary);
+        }
+
+        .invoice-card:hover {
+            box-shadow: 0 6px 20px rgba(108, 76, 241, 0.06);
+            transform: translateY(-2px);
+        }
+
+        .invoice-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .invoice-badge {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--primary);
+            background-color: var(--primary-container);
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .invoice-card-body h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--on-surface);
+            margin-bottom: 4px;
+        }
+
+        .invoice-card-date {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--on-surface-variant);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .invoice-card-date .material-icons-round {
+            font-size: 13px;
+        }
+
+        .invoice-total-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-top: 1px solid #F1EEF5;
+            padding-top: 12px;
+        }
+
+        .invoice-total-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .invoice-total-value {
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        /* --- Symmetrical Material Card Buttons --- */
+        .invoice-card-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-pdf {
+            background-color: var(--primary-container);
+            color: var(--on-primary-container);
+        }
+
+        .btn-pdf:active {
+            background-color: #D3C4EC;
+        }
+
+        .btn-edit {
+            background-color: #F1EEF5;
+            color: var(--on-surface-variant);
+        }
+
+        .btn-edit:active {
+            background-color: #E2DFE8;
+        }
+
+        .btn-delete {
+            background-color: var(--danger-container);
+            color: var(--on-danger-container);
+        }
+
+        .btn-delete:active {
+            background-color: #F4C4C2;
+        }
+
+        .btn-action:active {
+            transform: scale(0.95);
+        }
+
+        /* --- Standard Button Submissions --- */
+        .btn-submit {
+            width: 100%;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition-smooth);
+        }
+
+        .btn-submit:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 10px rgba(108, 76, 241, 0.1);
+        }
+
+        /* --- Strictly Locked Symmetrical Bottom Nav Bar (No floating offsets) --- */
+        .bottom-nav {
+            width: 100%;
+            height: calc(76px + var(--safe-area-bottom));
+            background-color: var(--card-bg);
+            border-radius: 24px 24px 0 0;
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.04);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            align-items: center;
+            padding-bottom: var(--safe-area-bottom);
+            z-index: 50;
+            border-top: 1px solid var(--border-light);
+            flex-shrink: 0; /* Mathematical guarantee layout cannot squeeze it out */
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--on-surface-variant);
+            gap: 4px;
+            transition: var(--transition-smooth);
+        }
+
+        .nav-icon-container {
+            padding: 6px 20px;
+            border-radius: 16px;
+            transition: var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-item.active .nav-icon-container {
+            background-color: var(--primary-container);
+            color: var(--on-primary-container);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        /* --- Premium Floating Action Button (FAB) --- */
+        #fab-add {
+            position: absolute;
+            bottom: calc(24px + var(--safe-area-bottom)); /* Placed safely over footer layout flow */
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-md);
+            z-index: 40;
+            transition: var(--transition-smooth);
+        }
+
+        #fab-add .material-icons-round {
+            font-size: 32px;
+        }
+
+        #fab-add:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 28px rgba(108, 76, 241, 0.3);
+        }
+
+        #fab-add:active {
+            transform: scale(0.95);
+        }
+
+        /* --- Premium Zero State Empty Display --- */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            width: 84px;
+            height: 84px;
+            border-radius: 50%;
+            background-color: var(--primary-container);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .empty-state-icon .material-icons-round {
+            font-size: 40px;
+        }
+
+        .empty-state-title {
+            font-size: 16px;
+            font-weight: 900;
+            color: var(--on-surface);
+            margin-bottom: 8px;
+        }
+
+        .empty-state-desc {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+            line-height: 1.6;
+            max-width: 250px;
+            font-weight: 500;
+        }
+
+        /* --- Android Home Indicator Simulation --- */
+        .simulator-home-pill {
+            display: none;
+            width: 100%;
+            background-color: var(--card-bg);
+            padding-bottom: 8px;
+            flex-shrink: 0;
+            z-index: 55;
+        }
+
+        @media (min-width: 768px) {
+            .simulator-home-pill {
+                display: block;
+            }
+        }
+
+        .home-pill {
+            width: 134px;
+            height: 5px;
+            background-color: #7A7980;
+            border-radius: 100px;
+            margin: 0 auto;
+        }
+
+        /* --- Full Screen Overlay Screens (Add / Settings / View) --- */
+        .full-screen-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: var(--surface);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .overlay-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light);
+            flex-shrink: 0;
+            background-color: var(--surface);
+        }
+
+        .overlay-back-btn {
+            background-color: #EFEFF5;
+            border: none;
+            cursor: pointer;
+            color: var(--on-surface-variant);
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-smooth);
+            flex-shrink: 0;
+        }
+
+        .overlay-back-btn:hover {
+            color: var(--primary);
+            background-color: var(--primary-container);
+        }
+
+        .overlay-back-btn:active {
+            transform: scale(0.92);
+        }
+
+        .overlay-title {
+            font-size: 16px;
+            font-weight: 900;
+            color: var(--on-surface);
+            letter-spacing: -0.3px;
+        }
+
+        .overlay-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 16px 40px 16px;
+        }
+
+        .overlay-body::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* --- Invoice Card is now fully tappable --- */
+        .invoice-card {
+            cursor: pointer;
+        }
+
+        .invoice-card:active {
+            transform: scale(0.98);
+        }
+
+        /* --- View Screen Detail Rows --- */
+        .view-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #F1EEF5;
+            font-size: 13px;
+            gap: 12px;
+        }
+
+        .view-row:last-child {
+            border-bottom: none;
+        }
+
+        .view-row-label {
+            color: var(--on-surface-variant);
+            font-weight: 600;
+        }
+
+        .view-row-value {
+            color: var(--on-surface);
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .view-items-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .view-items-table th {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94A3B8;
+            font-weight: 800;
+            text-align: left;
+            padding: 6px 4px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .view-items-table td {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--on-surface);
+            padding: 8px 4px;
+            border-bottom: 1px solid #F8F7FC;
+        }
+
+        .view-items-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .view-grandtotal-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            padding-top: 12px;
+            border-top: 1px solid #F1EEF5;
+        }
+
+        .view-action-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-action-lg {
+            padding: 12px 8px;
+            border-radius: 14px;
+            font-size: 12px;
+            justify-content: center;
+        }
+
+        /* --- App-Native Alert / Confirm Modal --- */
+        .app-modal-overlay {
+            position: absolute;
+            inset: 0;
+            background-color: rgba(15, 14, 23, 0.55);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .app-modal-card {
+            background-color: var(--card-bg);
+            border-radius: 22px;
+            padding: 28px 24px 24px 24px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+            text-align: center;
+            animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        .app-modal-icon-wrap {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px auto;
+        }
+
+        .app-modal-icon-wrap .material-icons-round {
+            font-size: 28px;
+            color: var(--primary);
+        }
+
+        .app-modal-icon-wrap.danger {
+            background-color: var(--danger-container);
+        }
+
+        .app-modal-icon-wrap.danger .material-icons-round {
+            color: var(--danger);
+        }
+
+        .app-modal-message {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--on-surface);
+            line-height: 1.5;
+            margin: 0 0 20px 0;
+        }
+
+        .app-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .app-modal-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .app-modal-btn-cancel {
+            background-color: #F1EEF5;
+            color: var(--on-surface-variant);
+        }
+
+        .app-modal-btn-cancel:active {
+            background-color: #E2DFE8;
+        }
+
+        .app-modal-btn-confirm {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: var(--shadow-md);
+        }
+
+        .app-modal-btn-confirm:active {
+            transform: scale(0.98);
+        }
+
+        .app-modal-btn-confirm.danger {
+            background: var(--danger);
+            box-shadow: none;
+        }
+
+        /* --- App Splash Screen (shown while Firebase resolves auth state) --- */
+        #app-loader {
+            z-index: 400;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-gradient);
+            gap: 20px;
+        }
+
+        .splash-logo {
+            width: 88px;
+            height: 88px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.16);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            animation: splashPulse 1.6s ease-in-out infinite;
+        }
+
+        .splash-logo .material-icons-round {
+            font-size: 44px;
+            color: #FFFFFF;
+        }
+
+        .splash-text {
+            text-align: center;
+        }
+
+        .splash-title {
+            font-size: 26px;
+            font-weight: 900;
+            color: #FFFFFF;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+
+        .splash-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.85);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 6px;
+        }
+
+        .splash-spinner {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #FFFFFF;
+            animation: spin 0.8s linear infinite;
+            margin-top: 12px;
+        }
+
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
 <body>
-<h2>Deep Link Test</h2>
 
-<a href="moneylog://hello">
-    Open My App
-</a>
+    <!-- Responsive Layout Simulator Wrapper -->
+    <div class="app-shell">
+        
+        <!-- Mock Top Status Bar -->
+        <div class="status-bar-mock">
+            <span>12:46</span>
+            <div class="status-icons">
+                <span class="material-icons-round">signal_cellular_alt</span>
+                <span class="material-icons-round">wifi</span>
+                <span class="material-icons-round">battery_full</span>
+            </div>
+        </div>
 
+        <!-- Sticky Layout Header -->
+        <header class="app-header">
+            <div class="header-main">
+                <div class="brand-group">
+                    <div class="brand-logo">
+                        <span class="material-icons-round">receipt_long</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:flex-start;">
+                        <h1 class="brand-title">BillBook</h1>
+                        <div id="bill-counter" class="bill-counter" style="margin-top:6px;">0 Bills</div>
+                    </div>
+                </div>
+
+                <button onclick="navigateToSettings()" class="btn-close" style="background:#EFEFF5;border-radius:12px;">
+                    <span class="material-icons-round">settings</span>
+                </button>
+            </div>
+
+            <div id="search-bar-container" class="search-container">
+                <span class="material-icons-round search-icon">search</span>
+                <input type="text" id="search-input" placeholder="Search customer or invoice..." style="box-sizing:border-box;">
+            </div>
+        </header>
+
+        <!-- Dynamic Main Scroll Area -->
+        <main class="content-area">
+            
+            <!-- LIST SCREEN -->
+            <div id="list-screen" class="fade-in">
+                <div id="bills-list"></div>
+                
+                <!-- Zero State empty message -->
+                <div id="empty-state" class="empty-state hidden">
+                    <div class="empty-state-icon">
+                        <span class="material-icons-round">analytics</span>
+                    </div>
+                    <p class="empty-state-title">No bills saved yet</p>
+                    <p class="empty-state-desc">Tap the floating action button below to create your first invoice.</p>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- INVOICE CREATOR FORM SCREEN (Full Screen Overlay) -->
+        <div id="form-screen" class="full-screen-overlay hidden">
+            <div class="overlay-header">
+                <button type="button" onclick="history.back()" class="overlay-back-btn">
+                    <span class="material-icons-round">arrow_back</span>
+                </button>
+                <h2 id="form-title" class="overlay-title">New Invoice</h2>
+            </div>
+            <div class="overlay-body">
+                <form id="bill-form" onsubmit="saveBill(event)">
+                    <input type="hidden" id="edit-bill-id">
+                    
+                    <!-- Client Details Panel -->
+                    <div class="card-panel">
+                        <p class="card-panel-title">Client Information</p>
+                        <div class="form-group">
+                            <label class="form-label">Customer Name *</label>
+                            <input type="text" id="cust-name" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" id="cust-phone" class="form-control">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Bill Date</label>
+                                <input type="date" id="bill-date" required class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Bill No.</label>
+                                <input type="text" id="bill-number" readonly class="form-control form-control-readonly">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Items Section Panel -->
+                    <div class="card-panel">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <p class="card-panel-title" style="margin-bottom: 0;">Items List</p>
+                            <button type="button" onclick="openItemModal()" class="btn-action btn-pdf" style="padding: 6px 12px; border-radius: 8px;">
+                                <span class="material-icons-round" style="font-size: 14px;">add</span> Add Item
+                            </button>
+                        </div>
+                        <div id="items-list-container">
+                            <!-- Injected rows -->
+                        </div>
+                    </div>
+
+                    <!-- Finance Aggregations Panel -->
+                    <div class="card-panel">
+                        <p class="card-panel-title">Billing Summary</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Discount (%)</label>
+                                <input type="number" id="bill-discount" min="0" max="100" value="0" oninput="calculateGrandTotal()" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Tax / GST (%)</label>
+                                <input type="number" id="bill-tax" min="0" max="100" value="0" oninput="calculateGrandTotal()" class="form-control">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--on-surface-variant); padding-top: 12px; border-top: 1px solid #F1EEF5;">
+                            <span>Subtotal:</span>
+                            <span id="label-subtotal">₹0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; color: var(--primary); margin-top: 8px;">
+                            <span style="font-size: 13px; font-weight: 900; uppercase tracking-wide;">Grand Total:</span>
+                            <span id="label-grandtotal" style="font-size: 18px; font-weight: 900;">₹0.00</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-submit">
+                        <span class="material-icons-round">save</span> Save Invoice
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- SETTINGS SCREEN (Full Screen Overlay) -->
+        <div id="settings-screen" class="full-screen-overlay hidden">
+            <div class="overlay-header">
+                <button type="button" onclick="history.back()" class="overlay-back-btn">
+                    <span class="material-icons-round">arrow_back</span>
+                </button>
+                <h2 class="overlay-title">Settings</h2>
+            </div>
+            <div class="overlay-body">
+                <form id="settings-form" onsubmit="saveSettings(event)">
+                    <div class="card-panel">
+                        <p class="card-panel-title">Business Header Metadata</p>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Shop / Business Name *</label>
+                            <input type="text" id="shop-name" required class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Location / Address *</label>
+                            <input type="text" id="shop-address" required class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Contact Number *</label>
+                            <input type="text" id="shop-phone" required class="form-control">
+                        </div>
+
+                        <button type="submit" class="btn-submit" style="margin-top: 4px;">
+                            <span class="material-icons-round">save</span> Save Configuration
+                        </button>
+                    </div>
+
+                    <div class="card-panel">
+                        <p class="card-panel-title">User</p>
+                        <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Signed in as <strong id="account-email">—</strong></p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button type="button" id="backup-btn" onclick="window.backupToCloud()" class="btn-action btn-pdf btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">cloud_upload</span> Backup
+                            </button>
+                            <button type="button" id="restore-btn" onclick="window.restoreFromCloud()" class="btn-action btn-edit btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">cloud_download</span> Restore
+                            </button>
+                        </div>
+
+                        <button type="button" onclick="confirmLogout()" class="btn-submit" style="background: var(--danger); box-shadow: none; margin-top: 16px;">
+                            <span class="material-icons-round">logout</span> Log Out
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- INVOICE VIEW SCREEN (Full Screen Overlay, Read-Only) -->
+        <div id="view-screen" class="full-screen-overlay hidden">
+            <div class="overlay-header">
+                <button type="button" onclick="history.back()" class="overlay-back-btn">
+                    <span class="material-icons-round">arrow_back</span>
+                </button>
+                <h2 class="overlay-title">Invoice Details</h2>
+            </div>
+            <div class="overlay-body" id="view-content">
+                <!-- Injected by renderViewScreen() -->
+            </div>
+        </div>
+
+        <!-- APP SPLASH SCREEN (shown while Firebase resolves auth state) -->
+        <div id="app-loader" class="full-screen-overlay">
+            <div class="splash-logo">
+                <span class="material-icons-round">receipt_long</span>
+            </div>
+            <div class="splash-text">
+                <h1 class="splash-title">BillBook</h1>
+                <p class="splash-subtitle">Smart Invoicing</p>
+            </div>
+            <div class="splash-spinner"></div>
+        </div>
+
+        <!-- AUTH SCREEN (Login / Signup Gate, shown on load until signed in) -->
+        <div id="auth-screen" class="full-screen-overlay hidden" style="z-index: 300;">
+            <div class="overlay-body" style="display: flex; flex-direction: column; justify-content: center;">
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div class="brand-logo" style="margin: 0 auto 16px auto;">
+                        <span class="material-icons-round">receipt_long</span>
+                    </div>
+                    <h1 class="brand-title" style="font-size: 24px;">BillBook</h1>
+                    <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 600; margin-top: 4px;">Sign in to manage your invoices</p>
+                </div>
+
+                <div id="auth-error" class="hidden" style="background-color: var(--danger-container); color: var(--on-danger-container); font-size: 12px; font-weight: 700; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px; text-align: center;"></div>
+
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="auth-email" required class="form-control" placeholder="you@example.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="auth-password" required minlength="6" class="form-control" placeholder="••••••••" autocomplete="current-password">
+                    </div>
+
+                    <button type="submit" id="auth-submit-btn" class="btn-submit" style="margin-top: 8px;">
+                        <span class="material-icons-round">login</span> <span id="auth-submit-label">Login</span>
+                    </button>
+                </form>
+
+                <p style="text-align: center; font-size: 12px; font-weight: 600; color: var(--on-surface-variant); margin-top: 20px;">
+                    <span id="auth-toggle-text">Don't have an account?</span>
+                    <a href="javascript:void(0)" onclick="toggleAuthMode()" id="auth-toggle-link" style="color: var(--primary); font-weight: 800; text-decoration: none;">Sign Up</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Floating Action Button (FAB) -->
+        <button id="fab-add" onclick="navigateToForm()">
+            <span class="material-icons-round">add</span>
+        </button>
+
+        
+
+        <!-- Simulator Home Gesture Mock -->
+        <div class="simulator-home-pill">
+            <div class="home-pill"></div>
+        </div>
+
+        <!-- APP-NATIVE ALERT / CONFIRM MODAL -->
+        <div id="app-modal-overlay" class="app-modal-overlay hidden">
+            <div class="app-modal-card">
+                <div id="app-modal-icon-wrap" class="app-modal-icon-wrap">
+                    <span id="app-modal-icon" class="material-icons-round">info</span>
+                </div>
+                <p id="app-modal-message" class="app-modal-message"></p>
+                <div class="app-modal-actions">
+                    <button id="app-modal-cancel-btn" type="button" class="app-modal-btn app-modal-btn-cancel hidden">Cancel</button>
+                    <button id="app-modal-confirm-btn" type="button" class="app-modal-btn app-modal-btn-confirm">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD / EDIT ITEM MODAL -->
+        <div id="item-modal-overlay" class="app-modal-overlay hidden">
+            <div class="app-modal-card" style="text-align: left;">
+                <p id="item-modal-title" class="card-panel-title" style="text-align: center;">Add Item</p>
+                <div class="form-group">
+                    <label class="form-label">Item Name</label>
+                    <input type="text" id="item-modal-name" class="form-control" placeholder="e.g. Consulting Service">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Qty</label>
+                        <input type="number" id="item-modal-qty" min="1" value="1" class="form-control">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Price</label>
+                        <input type="number" id="item-modal-price" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                </div>
+                <div class="app-modal-actions" style="margin-top: 4px;">
+                    <button type="button" onclick="closeItemModal()" class="app-modal-btn app-modal-btn-cancel">Cancel</button>
+                    <button type="button" onclick="saveItemModal()" class="app-modal-btn app-modal-btn-confirm">Save Item</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Controllers -->
+    <script>
+        // --- Core Application Storage State ---
+        let authMode = 'login';
+
+        function toggleAuthMode() {
+            authMode = authMode === 'login' ? 'signup' : 'login';
+            const isLogin = authMode === 'login';
+            document.getElementById('auth-submit-label').innerText = isLogin ? 'Login' : 'Sign Up';
+            document.getElementById('auth-toggle-text').innerText = isLogin ? "Don't have an account?" : "Already have an account?";
+            document.getElementById('auth-toggle-link').innerText = isLogin ? 'Sign Up' : 'Login';
+            const errorEl = document.getElementById('auth-error');
+            errorEl.innerText = '';
+            errorEl.classList.add('hidden');
+        }
+
+        function handleAuthSubmit(e) {
+            e.preventDefault();
+            if (authMode === 'login') {
+                window.loginUser();
+            } else {
+                window.signupUser();
+            }
+        }
+
+        // --- App-Native Alert / Confirm (replaces browser alert()/confirm()) ---
+        function showAppModal(message, { icon = 'info', danger = false, showCancel = false, confirmLabel = 'OK', cancelLabel = 'Cancel' } = {}) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById('app-modal-overlay');
+                const msgEl = document.getElementById('app-modal-message');
+                const iconEl = document.getElementById('app-modal-icon');
+                const iconWrap = document.getElementById('app-modal-icon-wrap');
+                const confirmBtn = document.getElementById('app-modal-confirm-btn');
+                const cancelBtn = document.getElementById('app-modal-cancel-btn');
+
+                msgEl.innerText = message;
+                iconEl.innerText = icon;
+                iconWrap.classList.toggle('danger', danger);
+                confirmBtn.innerText = confirmLabel;
+                confirmBtn.classList.toggle('danger', danger);
+                cancelBtn.innerText = cancelLabel;
+                cancelBtn.classList.toggle('hidden', !showCancel);
+
+                overlay.classList.remove('hidden');
+
+                function cleanup(result) {
+                    overlay.classList.add('hidden');
+                    confirmBtn.removeEventListener('click', onConfirm);
+                    cancelBtn.removeEventListener('click', onCancel);
+                    resolve(result);
+                }
+                function onConfirm() { cleanup(true); }
+                function onCancel() { cleanup(false); }
+
+                confirmBtn.addEventListener('click', onConfirm);
+                cancelBtn.addEventListener('click', onCancel);
+            });
+        }
+
+        function showAppAlert(message, options = {}) {
+            return showAppModal(message, { ...options, showCancel: false, confirmLabel: options.confirmLabel || 'OK' });
+        }
+
+        function showAppConfirm(message, options = {}) {
+            return showAppModal(message, { ...options, showCancel: true, confirmLabel: options.confirmLabel || 'Confirm', cancelLabel: options.cancelLabel || 'Cancel' });
+        }
+
+        async function confirmLogout() {
+            const confirmed = await showAppConfirm("Are you sure you want to log out?", {
+                icon: 'logout',
+                danger: true,
+                confirmLabel: 'Log Out'
+            });
+            if (confirmed) {
+                window.logoutUser();
+            }
+        }
+
+        let bills = JSON.parse(localStorage.getItem('bills')) || [];
+        let shopSettings = JSON.parse(localStorage.getItem('billbook_settings')) || {
+            name: 'BillBook Retailers',
+            address: '123 Market Road, New Delhi',
+            phone: '+91 98765 43210'
+        };
+        let currentEditingId = null;
+
+        // Startup Hooks
+        window.addEventListener('DOMContentLoaded', () => {
+            initShopSettingsForm();
+            renderBillsList();
+            setupSearchEngine();
+            document.getElementById('bill-date').valueAsDate = new Date();
+            history.replaceState({ screen: 'list' }, '', '');
+        });
+
+        function initShopSettingsForm() {
+            document.getElementById('shop-name').value = shopSettings.name;
+            document.getElementById('shop-address').value = shopSettings.address;
+            document.getElementById('shop-phone').value = shopSettings.phone;
+        }
+
+        // --- Bridge functions for the Firestore backup/restore module script ---
+        function getBackupPayload() {
+            return { bills, shopSettings };
+        }
+
+        function applyRestoredData(data) {
+            bills = Array.isArray(data.bills) ? data.bills : [];
+            if (data.shopSettings) shopSettings = data.shopSettings;
+            localStorage.setItem('bills', JSON.stringify(bills));
+            localStorage.setItem('billbook_settings', JSON.stringify(shopSettings));
+            initShopSettingsForm();
+            renderBillsList();
+        }
+
+        function generateBillNumber() {
+            return 'BB-' + Math.floor(100000 + Math.random() * 900000);
+        }
+
+        function setupSearchEngine() {
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                renderBillsList(query);
+            });
+        }
+
+        // --- Mobile / Hardware Back Button Support ---
+        // Each forward navigation pushes a history entry; the back button
+        // (in-app arrow or the device's own back gesture) simply calls
+        // history.back(), and this handler restores the correct screen.
+        // From the home (list) screen there is nothing left to pop, so the
+        // device's default back behavior takes over and the app exits.
+        let isPopping = false;
+
+        window.addEventListener('popstate', (e) => {
+            isPopping = true;
+            const state = e.state || { screen: 'list' };
+            if (state.screen === 'form') {
+                navigateToForm(state.billId || null);
+            } else if (state.screen === 'settings') {
+                navigateToSettings();
+            } else if (state.screen === 'view') {
+                navigateToView(state.billId);
+            } else {
+                navigateToList();
+            }
+            isPopping = false;
+        });
+
+        // --- Screen Transitions (Perfect Tab Controls) ---
+        function switchScreen(screenId, navId) {
+            const screens = ['list-screen', 'form-screen', 'settings-screen', 'view-screen'];
+            screens.forEach(s => {
+                const element = document.getElementById(s);
+                if (s === screenId) {
+                    element.classList.remove('hidden');
+                    element.classList.add('fade-in');
+                } else {
+                    element.classList.add('hidden');
+                    element.classList.remove('fade-in');
+                }
+            });
+
+            // Adjust nav container selections
+            ['nav-home','nav-add','nav-settings'].forEach(btn=>{
+ const buttonEl=document.getElementById(btn);
+ if(buttonEl){
+   if(btn===navId) buttonEl.classList.add('active');
+   else buttonEl.classList.remove('active');
+ }
+});
+
+            // Handle components visibility depending on screen
+            const fab = document.getElementById('fab-add');
+            const search = document.getElementById('search-bar-container');
+            if (screenId === 'list-screen') {
+                fab.style.display = 'flex';
+                search.style.display = 'block';
+            } else {
+                fab.style.display = 'none';
+                search.style.display = 'none';
+            }
+        }
+
+        // Navigation Hooks
+        function navigateToList() {
+            switchScreen('list-screen', 'nav-home');
+            resetInvoiceForm();
+            renderBillsList();
+        }
+
+        function navigateToForm(billId = null) {
+            switchScreen('form-screen', 'nav-add');
+
+            if (billId) {
+                const bill = bills.find(b => b.id === billId);
+                if (bill) {
+                    currentEditingId = bill.id;
+                    document.getElementById('form-title').innerText = "Edit Invoice";
+                    document.getElementById('edit-bill-id').value = bill.id;
+                    document.getElementById('cust-name').value = bill.customerName;
+                    document.getElementById('cust-phone').value = bill.customerPhone || '';
+                    document.getElementById('bill-date').value = bill.date;
+                    document.getElementById('bill-number').value = bill.billNo;
+                    document.getElementById('bill-discount').value = bill.discount || 0;
+                    document.getElementById('bill-tax').value = bill.tax || 0;
+
+                    currentFormItems = bill.items.map(item => ({
+                        id: 'item-' + Math.random().toString(36).substring(2, 9),
+                        name: item.name,
+                        qty: item.qty,
+                        price: item.price
+                    }));
+                    renderItemRows();
+                }
+            } else {
+                currentEditingId = null;
+                document.getElementById('form-title').innerText = "New Invoice";
+                resetInvoiceForm();
+            }
+            calculateGrandTotal();
+
+            if (!isPopping) {
+                history.pushState({ screen: 'form', billId }, '', '');
+            }
+        }
+
+        function navigateToSettings() {
+            switchScreen('settings-screen', 'nav-settings');
+            if (!isPopping) {
+                history.pushState({ screen: 'settings' }, '', '');
+            }
+        }
+
+        function navigateToView(billId) {
+            const bill = bills.find(b => b.id === billId);
+            if (!bill) return;
+            switchScreen('view-screen', null);
+            renderViewScreen(bill);
+            if (!isPopping) {
+                history.pushState({ screen: 'view', billId }, '', '');
+            }
+        }
+
+        function resetInvoiceForm() {
+            document.getElementById('bill-form').reset();
+            document.getElementById('edit-bill-id').value = '';
+            document.getElementById('bill-number').value = generateBillNumber();
+            document.getElementById('bill-date').valueAsDate = new Date();
+            currentFormItems = [];
+            renderItemRows();
+            calculateGrandTotal();
+        }
+
+        // --- Add / Edit Item Modal ---
+        let currentFormItems = [];
+        let editingItemRowId = null;
+
+        function openItemModal(itemId = null) {
+            editingItemRowId = itemId;
+            const nameInput = document.getElementById('item-modal-name');
+            const qtyInput = document.getElementById('item-modal-qty');
+            const priceInput = document.getElementById('item-modal-price');
+            const title = document.getElementById('item-modal-title');
+
+            if (itemId) {
+                const item = currentFormItems.find(i => i.id === itemId);
+                title.innerText = 'Edit Item';
+                nameInput.value = item ? item.name : '';
+                qtyInput.value = item ? item.qty : 1;
+                priceInput.value = item ? item.price : '';
+            } else {
+                title.innerText = 'Add Item';
+                nameInput.value = '';
+                qtyInput.value = 1;
+                priceInput.value = '';
+            }
+
+            document.getElementById('item-modal-overlay').classList.remove('hidden');
+            nameInput.focus();
+        }
+
+        function closeItemModal() {
+            document.getElementById('item-modal-overlay').classList.add('hidden');
+            editingItemRowId = null;
+        }
+
+        async function saveItemModal() {
+            const name = document.getElementById('item-modal-name').value.trim();
+            const qty = parseInt(document.getElementById('item-modal-qty').value) || 1;
+            const price = parseFloat(document.getElementById('item-modal-price').value) || 0;
+
+            if (!name) {
+                await showAppAlert("Please enter an item name.", { icon: 'error_outline', danger: true });
+                return;
+            }
+
+            if (editingItemRowId) {
+                currentFormItems = currentFormItems.map(i => i.id === editingItemRowId ? { ...i, name, qty, price } : i);
+            } else {
+                currentFormItems.push({ id: 'item-' + Math.random().toString(36).substring(2, 9), name, qty, price });
+            }
+
+            closeItemModal();
+            renderItemRows();
+            calculateGrandTotal();
+        }
+
+        async function removeItemRow(id) {
+            const confirmed = await showAppConfirm("Remove this item from the invoice?", { icon: 'delete_outline', danger: true, confirmLabel: 'Remove' });
+            if (!confirmed) return;
+            currentFormItems = currentFormItems.filter(i => i.id !== id);
+            renderItemRows();
+            calculateGrandTotal();
+        }
+
+        function renderItemRows() {
+            const container = document.getElementById('items-list-container');
+            if (currentFormItems.length === 0) {
+                container.innerHTML = `<p class="item-row-empty">No items added yet.</p>`;
+                return;
+            }
+            container.innerHTML = currentFormItems.map(item => `
+                <div class="item-row">
+                    <div class="item-row-info">
+                        <p class="item-row-name">${item.name}</p>
+                        <p class="item-row-meta">${item.qty} × ₹${item.price.toFixed(2)}</p>
+                    </div>
+                    <p class="item-row-amount">₹${(item.qty * item.price).toFixed(2)}</p>
+                    <button type="button" onclick="openItemModal('${item.id}')" class="btn-delete-row" style="color: var(--on-surface-variant);">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                    <button type="button" onclick="removeItemRow('${item.id}')" class="btn-delete-row">
+                        <span class="material-icons-round">delete</span>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // --- Pricing Core Calculations ---
+        function calculateGrandTotal() {
+            let subtotal = 0;
+            currentFormItems.forEach(item => {
+                subtotal += (item.qty || 0) * (item.price || 0);
+            });
+
+            const discount = parseFloat(document.getElementById('bill-discount').value) || 0;
+            const tax = parseFloat(document.getElementById('bill-tax').value) || 0;
+
+            const discAmt = subtotal * (discount / 100);
+            const taxable = subtotal - discAmt;
+            const taxAmt = taxable * (tax / 100);
+            const total = taxable + taxAmt;
+
+            document.getElementById('label-subtotal').innerText = '₹' + subtotal.toFixed(2);
+            document.getElementById('label-grandtotal').innerText = '₹' + total.toFixed(2);
+
+            return { subtotal, discAmt, taxAmt, total };
+        }
+
+        // --- Save and Configuration Logic ---
+        // Sets up store settings internally inside client memory profiles
+        async function saveSettings(e) {
+            e.preventDefault();
+            shopSettings = {
+                name: document.getElementById('shop-name').value.trim(),
+                address: document.getElementById('shop-address').value.trim(),
+                phone: document.getElementById('shop-phone').value.trim()
+            };
+            localStorage.setItem('billbook_settings', JSON.stringify(shopSettings));
+            await showAppAlert("Configuration settings updated successfully.", { icon: 'check_circle' });
+            history.back();
+        }
+
+        async function saveBill(e) {
+            e.preventDefault();
+
+            if (currentFormItems.length === 0) {
+                await showAppAlert("Please declare at least one line item.", { icon: 'error_outline', danger: true });
+                return;
+            }
+
+            const items = currentFormItems.map(item => ({
+                name: item.name,
+                qty: item.qty,
+                price: item.price
+            }));
+
+            const math = calculateGrandTotal();
+            const billId = document.getElementById('edit-bill-id').value || 'ID-' + Date.now();
+            const payload = {
+                id: billId,
+                billNo: document.getElementById('bill-number').value,
+                customerName: document.getElementById('cust-name').value.trim(),
+                customerPhone: document.getElementById('cust-phone').value.trim(),
+                date: document.getElementById('bill-date').value,
+                items,
+                discount: parseFloat(document.getElementById('bill-discount').value) || 0,
+                tax: parseFloat(document.getElementById('bill-tax').value) || 0,
+                subtotal: math.subtotal,
+                grandTotal: math.total
+            };
+
+            if (currentEditingId) {
+                bills = bills.map(b => b.id === currentEditingId ? payload : b);
+            } else {
+                bills.unshift(payload);
+            }
+
+            localStorage.setItem('bills', JSON.stringify(bills));
+            history.back();
+        }
+
+        // --- Render UI Card Layout ---
+        function renderBillsList(query = '') {
+            const list = document.getElementById('bills-list');
+            list.innerHTML = '';
+
+            const filtered = bills.filter(b => {
+                const pattern = [
+                    b.customerName,
+                    b.billNo,
+                    b.customerPhone,
+                    b.date,
+                    formatDate(b.date),
+                    b.grandTotal.toFixed(2),
+                    b.grandTotal.toString()
+                ].join(' ').toLowerCase();
+                return pattern.includes(query);
+            });
+
+            document.getElementById('bill-counter').innerText = `${bills.length} Bill${bills.length !== 1 ? 's' : ''}`;
+
+            if (filtered.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            } else {
+                document.getElementById('empty-state').classList.add('hidden');
+            }
+
+            filtered.forEach(bill => {
+                const card = `
+                    <div class="invoice-card fade-in" onclick="navigateToView('${bill.id}')">
+                        <div class="invoice-card-header">
+                            <span class="invoice-badge">${bill.billNo}</span>
+                            <span class="invoice-card-date">
+                                <span class="material-icons-round">calendar_today</span>
+                                ${formatDate(bill.date)}
+                            </span>
+                        </div>
+                        <div class="invoice-card-body">
+                            <h3>${bill.customerName}</h3>
+                            ${bill.customerPhone ? `<p style="font-size: 11px; color: var(--on-surface-variant); font-weight: 500;">Ph: ${bill.customerPhone}</p>` : ''}
+                        </div>
+                        <div class="invoice-total-section">
+                            <div>
+                                <span class="invoice-total-label">Grand Total</span>
+                                <div class="invoice-total-value">₹${bill.grandTotal.toFixed(2)}</div>
+                            </div>
+                            <span class="material-icons-round" style="color: var(--on-surface-variant);">chevron_right</span>
+                        </div>
+                    </div>
+                `;
+                list.insertAdjacentHTML('beforeend', card);
+            });
+        }
+
+        // --- Render Read-Only Invoice Detail Screen ---
+        function renderViewScreen(bill) {
+            const discAmt = bill.subtotal * ((bill.discount || 0) / 100);
+            const taxAmt = (bill.subtotal - discAmt) * ((bill.tax || 0) / 100);
+
+            let rows = '';
+            bill.items.forEach(item => {
+                rows += `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td style="text-align:center;">${item.qty}</td>
+                        <td style="text-align:right;">₹${item.price.toFixed(2)}</td>
+                        <td style="text-align:right;">₹${(item.qty * item.price).toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('view-content').innerHTML = `
+                <div class="card-panel">
+                    <p class="card-panel-title">Client Information</p>
+                    <div class="view-row">
+                        <span class="view-row-label">Customer</span>
+                        <span class="view-row-value">${bill.customerName}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Phone</span>
+                        <span class="view-row-value">${bill.customerPhone || 'N/A'}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Bill No.</span>
+                        <span class="view-row-value">${bill.billNo}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Date</span>
+                        <span class="view-row-value">${formatDate(bill.date)}</span>
+                    </div>
+                </div>
+
+                <div class="card-panel">
+                    <p class="card-panel-title">Items</p>
+                    <table class="view-items-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th style="text-align:center;">Qty</th>
+                                <th style="text-align:right;">Price</th>
+                                <th style="text-align:right;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card-panel">
+                    <p class="card-panel-title">Billing Summary</p>
+                    <div class="view-row">
+                        <span class="view-row-label">Subtotal</span>
+                        <span class="view-row-value">₹${bill.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Discount (${bill.discount || 0}%)</span>
+                        <span class="view-row-value">-₹${discAmt.toFixed(2)}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Tax (${bill.tax || 0}%)</span>
+                        <span class="view-row-value">+₹${taxAmt.toFixed(2)}</span>
+                    </div>
+                    <div class="view-grandtotal-row">
+                        <span style="font-size:13px; font-weight:900; color:var(--on-surface);">Grand Total</span>
+                        <span style="font-size:18px; font-weight:900; color:var(--primary);">₹${bill.grandTotal.toFixed(2)}</span>
+                    </div>
+                </div>
+
+                <div class="view-action-bar">
+                    <button type="button" class="btn-action btn-pdf btn-action-lg" onclick="exportToPDF('${bill.id}')">
+                        <span class="material-icons-round" style="font-size: 16px;">download</span> PDF
+                    </button>
+                    <button type="button" class="btn-action btn-edit btn-action-lg" onclick="navigateToForm('${bill.id}')">
+                        <span class="material-icons-round" style="font-size: 16px;">edit</span> Edit
+                    </button>
+                    <button type="button" class="btn-action btn-delete btn-action-lg" onclick="deleteBill('${bill.id}')">
+                        <span class="material-icons-round" style="font-size: 16px;">delete_outline</span> Delete
+                    </button>
+                </div>
+            `;
+        }
+
+        async function deleteBill(id) {
+            const confirmed = await showAppConfirm("Are you sure you want to permanently delete this invoice?", {
+                icon: 'delete_outline',
+                danger: true,
+                confirmLabel: 'Delete'
+            });
+            if (confirmed) {
+                bills = bills.filter(b => b.id !== id);
+                localStorage.setItem('bills', JSON.stringify(bills));
+                history.back();
+            }
+        }
+
+        // --- Sandboxed PDF Exporter (No Layout Clips / No Blank Output) ---
+        function exportToPDF(billId) {
+            const bill = bills.find(b => b.id === billId);
+            if (!bill) return;
+
+            const discAmt = bill.subtotal * ((bill.discount || 0) / 100);
+            const taxAmt = (bill.subtotal - discAmt) * ((bill.tax || 0) / 100);
+
+            // Construct invoice rows inside template
+            let rowItemsHtml = '';
+            bill.items.forEach(item => {
+                const totalItem = item.qty * item.price;
+                rowItemsHtml += `
+                    <tr style="border-b: 1px solid #f1f5f9;">
+                        <td style="padding: 14px 18px; font-size: 13px; font-weight: 600; color: #1e293b; text-align: left;">${item.name}</td>
+                        <td style="padding: 14px 18px; font-size: 13px; color: #64748b; text-align: center; font-weight: 700;">${item.qty}</td>
+                        <td style="padding: 14px 18px; font-size: 13px; color: #64748b; text-align: right; font-weight: 700;">₹${item.price.toFixed(2)}</td>
+                        <td style="padding: 14px 18px; font-size: 13px; font-weight: 800; color: #0f172a; text-align: right;">₹${totalItem.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            // Sandboxed in-memory template representation
+            const pdfHTMLString = `
+                <div style="font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif; padding: 48px; color: #1e293b; background-color: #ffffff; width: 794px; min-height: 1060px; box-sizing: border-box; position: relative;">
+                    <!-- Brand Header -->
+                    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding-bottom: 28px; margin-bottom: 36px;">
+                        <div>
+                            <h1 style="font-size: 34px; font-weight: 900; color: #0f172a; margin: 0 0 6px 0; letter-spacing: -0.8px;">INVOICE</h1>
+                            <p style="font-size: 13px; color: #64748b; margin: 0; font-weight: 700;">No: ${bill.billNo}</p>
+                            <p style="font-size: 13px; color: #64748b; margin: 2px 0 0 0; font-weight: 700;">Date: ${formatDate(bill.date)}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <h2 style="font-size: 18px; font-weight: 800; color: #6750A4; margin: 0 0 4px 0; text-transform: uppercase;">${shopSettings.name}</h2>
+                            <p style="font-size: 12px; color: #64748b; margin: 0 0 2px 0; font-weight: 500; width: 220px; line-height: 1.4;">${shopSettings.address}</p>
+                            <p style="font-size: 12px; color: #0f172a; margin: 0; font-weight: 700;">Ph: ${shopSettings.phone}</p>
+                        </div>
+                    </div>
+
+                    <!-- Bill Details Row -->
+                    <div style="margin-bottom: 36px;">
+                        <h3 style="font-size: 11px; font-weight: 800; color: #94a3b8; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.5px;">Billed To</h3>
+                        <p style="font-size: 18px; font-weight: 900; color: #0f172a; margin: 0 0 2px 0;">${bill.customerName}</p>
+                        <p style="font-size: 13px; font-weight: 600; color: #64748b; margin: 0;">${bill.customerPhone ? 'Ph: ' + bill.customerPhone : 'Ph: N/A'}</p>
+                    </div>
+
+                    <!-- Items Table -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 36px;">
+                        <thead>
+                            <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 14px 18px; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; text-align: left; tracking-style: 0.5px;">Item Description</th>
+                                <th style="padding: 14px 18px; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; text-align: center; width: 80px; tracking-style: 0.5px;">Qty</th>
+                                <th style="padding: 14px 18px; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; text-align: right; width: 120px; tracking-style: 0.5px;">Price</th>
+                                <th style="padding: 14px 18px; font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; text-align: right; width: 140px; tracking-style: 0.5px;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowItemsHtml}
+                        </tbody>
+                    </table>
+
+                    <!-- Totals Block -->
+                    <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
+                        <table style="width: 280px; font-size: 13px; color: #64748b; font-weight: 600; line-height: 2;">
+                            <tr>
+                                <td style="text-align: left; padding: 2px 0;">Subtotal:</td>
+                                <td style="text-align: right; padding: 2px 0; color: #0f172a;">₹${bill.subtotal.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: left; padding: 2px 0;">Discount (${bill.discount}%):</td>
+                                <td style="text-align: right; padding: 2px 0; color: #ef4444;">-₹${discAmt.toFixed(2)}</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="text-align: left; padding: 2px 0; padding-bottom: 8px;">Tax (${bill.tax}%):</td>
+                                <td style="text-align: right; padding: 2px 0; padding-bottom: 8px; color: #0f172a;">+₹${taxAmt.toFixed(2)}</td>
+                            </tr>
+                            <tr style="font-size: 16px; font-weight: 900; color: #0f172a;">
+                                <td style="text-align: left; padding-top: 14px;">Grand Total:</td>
+                                <td style="text-align: right; padding-top: 14px; color: #6750A4;">₹${bill.grandTotal.toFixed(2)}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Footer Signoff -->
+                    <div style="position: absolute; bottom: 48px; left: 48px; right: 48px; border-top: 1px solid #f1f5f9; padding-top: 24px; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>
+                            <p style="font-size: 12px; font-weight: 800; color: #0f172a; margin: 0;">Thank you for your business!</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="width: 140px; border-bottom: 1px solid #cbd5e1; margin-left: auto; margin-bottom: 6px;"></div>
+                            <p style="font-size: 10px; font-weight: 800; color: #94a3b8; uppercase tracking-wider; margin: 0; text-transform: uppercase;">Authorized Signatory</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const options = {
+                margin: 0,
+                filename: `${bill.billNo}_${bill.customerName.replace(/\s+/g, '_')}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true,
+                    letterRendering: true
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Parse and download memory template directly
+            html2pdf().from(pdfHTMLString).set(options).save();
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-IN', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+    </script>
 </body>
 </html>
