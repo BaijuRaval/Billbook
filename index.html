@@ -1928,7 +1928,15 @@
             list.innerHTML = '';
 
             const filtered = bills.filter(b => {
-                const pattern = `${b.customerName} ${b.billNo}`.toLowerCase();
+                const pattern = [
+                    b.customerName,
+                    b.billNo,
+                    b.customerPhone,
+                    b.date,
+                    formatDate(b.date),
+                    b.grandTotal.toFixed(2),
+                    b.grandTotal.toString()
+                ].join(' ').toLowerCase();
                 return pattern.includes(query);
             });
 
