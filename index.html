@@ -203,6 +203,10 @@
         }
 
         /* --- Global Resets & Safe Area Handling --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         html, body {
             height: 100%;
             margin: 0;
@@ -501,7 +505,7 @@
             background-color: var(--border-light);
         }
 
-        /* --- Inline Form Grid Row Elements --- */
+        /* --- Item Summary Rows (populated via Add Item modal) --- */
         .item-row {
             display: flex;
             gap: 8px;
@@ -515,6 +519,45 @@
             border-bottom: none;
             padding-bottom: 0;
             margin-bottom: 0;
+        }
+
+        .item-row-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-row-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--on-surface);
+            margin: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .item-row-meta {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--on-surface-variant);
+            margin-top: 2px;
+        }
+
+        .item-row-amount {
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 0 4px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .item-row-empty {
+            font-size: 12px;
+            color: var(--on-surface-variant);
+            text-align: center;
+            padding: 16px 0;
+            font-weight: 600;
         }
 
         .btn-delete-row {
@@ -1260,7 +1303,7 @@
                     <div class="card-panel">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                             <p class="card-panel-title" style="margin-bottom: 0;">Items List</p>
-                            <button type="button" onclick="addItemRow()" class="btn-action btn-pdf" style="padding: 6px 12px; border-radius: 8px;">
+                            <button type="button" onclick="openItemModal()" class="btn-action btn-pdf" style="padding: 6px 12px; border-radius: 8px;">
                                 <span class="material-icons-round" style="font-size: 14px;">add</span> Add Item
                             </button>
                         </div>
@@ -1435,6 +1478,31 @@
                 <div class="app-modal-actions">
                     <button id="app-modal-cancel-btn" type="button" class="app-modal-btn app-modal-btn-cancel hidden">Cancel</button>
                     <button id="app-modal-confirm-btn" type="button" class="app-modal-btn app-modal-btn-confirm">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD / EDIT ITEM MODAL -->
+        <div id="item-modal-overlay" class="app-modal-overlay hidden">
+            <div class="app-modal-card" style="text-align: left;">
+                <p id="item-modal-title" class="card-panel-title" style="text-align: center;">Add Item</p>
+                <div class="form-group">
+                    <label class="form-label">Item Name</label>
+                    <input type="text" id="item-modal-name" class="form-control" placeholder="e.g. Consulting Service">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Qty</label>
+                        <input type="number" id="item-modal-qty" min="1" value="1" class="form-control">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Price</label>
+                        <input type="number" id="item-modal-price" min="0" step="0.01" value="0" class="form-control">
+                    </div>
+                </div>
+                <div class="app-modal-actions" style="margin-top: 4px;">
+                    <button type="button" onclick="closeItemModal()" class="app-modal-btn app-modal-btn-cancel">Cancel</button>
+                    <button type="button" onclick="saveItemModal()" class="app-modal-btn app-modal-btn-confirm">Save Item</button>
                 </div>
             </div>
         </div>
@@ -1636,18 +1704,19 @@
                     document.getElementById('bill-number').value = bill.billNo;
                     document.getElementById('bill-discount').value = bill.discount || 0;
                     document.getElementById('bill-tax').value = bill.tax || 0;
-                    
-                    const container = document.getElementById('items-list-container');
-                    container.innerHTML = '';
-                    bill.items.forEach(item => {
-                        addItemRow(item.name, item.qty, item.price);
-                    });
+
+                    currentFormItems = bill.items.map(item => ({
+                        id: 'item-' + Math.random().toString(36).substring(2, 9),
+                        name: item.name,
+                        qty: item.qty,
+                        price: item.price
+                    }));
+                    renderItemRows();
                 }
             } else {
                 currentEditingId = null;
                 document.getElementById('form-title').innerText = "New Invoice";
                 resetInvoiceForm();
-                addItemRow();
             }
             calculateGrandTotal();
 
@@ -1678,56 +1747,102 @@
             document.getElementById('edit-bill-id').value = '';
             document.getElementById('bill-number').value = generateBillNumber();
             document.getElementById('bill-date').valueAsDate = new Date();
-            document.getElementById('items-list-container').innerHTML = '';
+            currentFormItems = [];
+            renderItemRows();
             calculateGrandTotal();
         }
 
-        // --- Dynamic Items Rows Configuration ---
-        function addItemRow(name = '', qty = 1, price = 0) {
-            const container = document.getElementById('items-list-container');
-            const id = 'row-' + Math.random().toString(36).substring(2, 9);
+        // --- Add / Edit Item Modal ---
+        let currentFormItems = [];
+        let editingItemRowId = null;
 
-            const row = document.createElement('div');
-            row.id = id;
-            row.className = "item-row";
-            row.innerHTML = `
-                <div style="flex: 1;">
-                    <input type="text" placeholder="Item Name" required value="${name}" class="item-name form-control">
-                </div>
-                <div style="width: 58px;">
-                    <input type="number" placeholder="Qty" min="1" required value="${qty}" oninput="calculateGrandTotal()" class="item-qty form-control" style="text-align: center; padding-left: 6px; padding-right: 6px;">
-                </div>
-                <div style="width: 82px;">
-                    <input type="number" placeholder="Price" min="0" step="0.01" required value="${price}" oninput="calculateGrandTotal()" class="item-price form-control" style="text-align: right; padding-left: 6px; padding-right: 6px;">
-                </div>
-                <button type="button" onclick="removeItemRow('${id}')" class="btn-delete-row">
-                    <span class="material-icons-round">delete</span>
-                </button>
-            `;
-            container.appendChild(row);
-            calculateGrandTotal();
-        }
+        function openItemModal(itemId = null) {
+            editingItemRowId = itemId;
+            const nameInput = document.getElementById('item-modal-name');
+            const qtyInput = document.getElementById('item-modal-qty');
+            const priceInput = document.getElementById('item-modal-price');
+            const title = document.getElementById('item-modal-title');
 
-        function removeItemRow(id) {
-            const el = document.getElementById(id);
-            if (el) {
-                el.remove();
-                calculateGrandTotal();
+            if (itemId) {
+                const item = currentFormItems.find(i => i.id === itemId);
+                title.innerText = 'Edit Item';
+                nameInput.value = item ? item.name : '';
+                qtyInput.value = item ? item.qty : 1;
+                priceInput.value = item ? item.price : '';
+            } else {
+                title.innerText = 'Add Item';
+                nameInput.value = '';
+                qtyInput.value = 1;
+                priceInput.value = '';
             }
+
+            document.getElementById('item-modal-overlay').classList.remove('hidden');
+            nameInput.focus();
+        }
+
+        function closeItemModal() {
+            document.getElementById('item-modal-overlay').classList.add('hidden');
+            editingItemRowId = null;
+        }
+
+        async function saveItemModal() {
+            const name = document.getElementById('item-modal-name').value.trim();
+            const qty = parseInt(document.getElementById('item-modal-qty').value) || 1;
+            const price = parseFloat(document.getElementById('item-modal-price').value) || 0;
+
+            if (!name) {
+                await showAppAlert("Please enter an item name.", { icon: 'error_outline', danger: true });
+                return;
+            }
+
+            if (editingItemRowId) {
+                currentFormItems = currentFormItems.map(i => i.id === editingItemRowId ? { ...i, name, qty, price } : i);
+            } else {
+                currentFormItems.push({ id: 'item-' + Math.random().toString(36).substring(2, 9), name, qty, price });
+            }
+
+            closeItemModal();
+            renderItemRows();
+            calculateGrandTotal();
+        }
+
+        async function removeItemRow(id) {
+            const confirmed = await showAppConfirm("Remove this item from the invoice?", { icon: 'delete_outline', danger: true, confirmLabel: 'Remove' });
+            if (!confirmed) return;
+            currentFormItems = currentFormItems.filter(i => i.id !== id);
+            renderItemRows();
+            calculateGrandTotal();
+        }
+
+        function renderItemRows() {
+            const container = document.getElementById('items-list-container');
+            if (currentFormItems.length === 0) {
+                container.innerHTML = `<p class="item-row-empty">No items added yet.</p>`;
+                return;
+            }
+            container.innerHTML = currentFormItems.map(item => `
+                <div class="item-row">
+                    <div class="item-row-info">
+                        <p class="item-row-name">${item.name}</p>
+                        <p class="item-row-meta">${item.qty} × ₹${item.price.toFixed(2)}</p>
+                    </div>
+                    <p class="item-row-amount">₹${(item.qty * item.price).toFixed(2)}</p>
+                    <button type="button" onclick="openItemModal('${item.id}')" class="btn-delete-row" style="color: var(--on-surface-variant);">
+                        <span class="material-icons-round">edit</span>
+                    </button>
+                    <button type="button" onclick="removeItemRow('${item.id}')" class="btn-delete-row">
+                        <span class="material-icons-round">delete</span>
+                    </button>
+                </div>
+            `).join('');
         }
 
         // --- Pricing Core Calculations ---
         function calculateGrandTotal() {
-            const names = document.querySelectorAll('.item-name');
-            const qtys = document.querySelectorAll('.item-qty');
-            const prices = document.querySelectorAll('.item-price');
-
             let subtotal = 0;
-            for (let i = 0; i < names.length; i++) {
-                const qty = parseFloat(qtys[i].value) || 0;
-                const price = parseFloat(prices[i].value) || 0;
-                subtotal += qty * price;
-            }
+            currentFormItems.forEach(item => {
+                subtotal += (item.qty || 0) * (item.price || 0);
+            });
 
             const discount = parseFloat(document.getElementById('bill-discount').value) || 0;
             const tax = parseFloat(document.getElementById('bill-tax').value) || 0;
@@ -1760,23 +1875,16 @@
         async function saveBill(e) {
             e.preventDefault();
 
-            const names = document.querySelectorAll('.item-name');
-            const qtys = document.querySelectorAll('.item-qty');
-            const prices = document.querySelectorAll('.item-price');
-
-            const items = [];
-            for (let i = 0; i < names.length; i++) {
-                items.push({
-                    name: names[i].value.trim(),
-                    qty: parseInt(qtys[i].value) || 1,
-                    price: parseFloat(prices[i].value) || 0
-                });
-            }
-
-            if (items.length === 0) {
+            if (currentFormItems.length === 0) {
                 await showAppAlert("Please declare at least one line item.", { icon: 'error_outline', danger: true });
                 return;
             }
+
+            const items = currentFormItems.map(item => ({
+                name: item.name,
+                qty: item.qty,
+                price: item.price
+            }));
 
             const math = calculateGrandTotal();
             const billId = document.getElementById('edit-bill-id').value || 'ID-' + Date.now();
