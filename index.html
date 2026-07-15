@@ -11,17 +11,10 @@
     <!-- html2pdf.js for zero-failure in-memory PDF compilation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- Firebase Authentication -->
+    <!-- Firebase (App + Firestore kept initialized for future use; no Auth in this build) -->
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-analytics.js";
-      import {
-        getAuth,
-        onAuthStateChanged,
-        signInWithEmailAndPassword,
-        createUserWithEmailAndPassword,
-        signOut
-      } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
       import {
         getFirestore,
         doc,
@@ -42,141 +35,13 @@
 
       const app = initializeApp(firebaseConfig);
       const analytics = getAnalytics(app);
-      const auth = getAuth(app);
       const db = getFirestore(app);
-      let currentUser = null;
 
-      function friendlyAuthError(code) {
-        const map = {
-          'auth/invalid-email': 'Please enter a valid email address.',
-          'auth/user-not-found': 'No account found with this email.',
-          'auth/wrong-password': 'Incorrect password.',
-          'auth/invalid-credential': 'Incorrect email or password.',
-          'auth/email-already-in-use': 'An account already exists with this email.',
-          'auth/weak-password': 'Password must be at least 6 characters.',
-          'auth/missing-password': 'Please enter a password.',
-          'auth/too-many-requests': 'Too many attempts. Please try again later.'
-        };
-        return map[code] || 'Something went wrong. Please try again.';
-      }
-
-      function showAuthError(message) {
-        const el = document.getElementById('auth-error');
-        if (!el) return;
-        el.innerText = message;
-        el.classList.remove('hidden');
-      }
-
-      function clearAuthError() {
-        const el = document.getElementById('auth-error');
-        if (!el) return;
-        el.innerText = '';
-        el.classList.add('hidden');
-      }
-
-      function setAuthLoading(isLoading) {
-        const btn = document.getElementById('auth-submit-btn');
-        if (btn) btn.disabled = isLoading;
-      }
-
-      window.loginUser = function () {
-        clearAuthError();
-        const email = document.getElementById('auth-email').value.trim();
-        const password = document.getElementById('auth-password').value;
-        setAuthLoading(true);
-        signInWithEmailAndPassword(auth, email, password)
-          .catch(err => showAuthError(friendlyAuthError(err.code)))
-          .finally(() => setAuthLoading(false));
-      };
-
-      window.signupUser = function () {
-        clearAuthError();
-        const email = document.getElementById('auth-email').value.trim();
-        const password = document.getElementById('auth-password').value;
-        if (password.length < 6) {
-          showAuthError('Password must be at least 6 characters.');
-          return;
-        }
-        setAuthLoading(true);
-        createUserWithEmailAndPassword(auth, email, password)
-          .catch(err => showAuthError(friendlyAuthError(err.code)))
-          .finally(() => setAuthLoading(false));
-      };
-
-      window.logoutUser = function () {
-        signOut(auth);
-      };
-
-      window.backupToCloud = async function () {
-        if (!currentUser) {
-          await window.showAppAlert('Please sign in first.', { icon: 'lock_outline' });
-          return;
-        }
-        const btn = document.getElementById('backup-btn');
-        const payload = window.getBackupPayload();
-        try {
-          if (btn) btn.disabled = true;
-          await setDoc(doc(db, 'billbook_users', currentUser.uid), {
-            bills: payload.bills,
-            shopSettings: payload.shopSettings,
-            updatedAt: serverTimestamp()
-          });
-          await window.showAppAlert('Backup completed successfully.', { icon: 'cloud_done' });
-        } catch (err) {
-          await window.showAppAlert('Backup failed: ' + err.message, { icon: 'error_outline', danger: true });
-        } finally {
-          if (btn) btn.disabled = false;
-        }
-      };
-
-      window.restoreFromCloud = async function () {
-        if (!currentUser) {
-          await window.showAppAlert('Please sign in first.', { icon: 'lock_outline' });
-          return;
-        }
-        const confirmed = await window.showAppConfirm('This will replace your current local data with the cloud backup. Continue?', {
-          icon: 'cloud_download',
-          confirmLabel: 'Restore'
-        });
-        if (!confirmed) return;
-        const btn = document.getElementById('restore-btn');
-        try {
-          if (btn) btn.disabled = true;
-          const snap = await getDoc(doc(db, 'billbook_users', currentUser.uid));
-          if (!snap.exists()) {
-            await window.showAppAlert('No cloud backup found for this account.', { icon: 'cloud_off' });
-            return;
-          }
-          const data = snap.data();
-          window.applyRestoredData({ bills: data.bills || [], shopSettings: data.shopSettings || null });
-          await window.showAppAlert('Restore completed successfully.', { icon: 'check_circle' });
-        } catch (err) {
-          await window.showAppAlert('Restore failed: ' + err.message, { icon: 'error_outline', danger: true });
-        } finally {
-          if (btn) btn.disabled = false;
-        }
-      };
-
-      onAuthStateChanged(auth, (user) => {
-        const authScreen = document.getElementById('auth-screen');
-        const loader = document.getElementById('app-loader');
-        if (!authScreen) return;
-        if (user) {
-          currentUser = user;
-          authScreen.classList.add('hidden');
-          const emailEl = document.getElementById('account-email');
-          if (emailEl) emailEl.innerText = user.email || '—';
-        } else {
-          currentUser = null;
-          authScreen.classList.remove('hidden');
-          const emailInput = document.getElementById('auth-email');
-          const passwordInput = document.getElementById('auth-password');
-          if (emailInput) emailInput.value = '';
-          if (passwordInput) passwordInput.value = '';
-          clearAuthError();
-        }
-        if (loader) loader.classList.add('hidden');
-      });
+      // Firestore is initialized and ready (window.firebaseDb) for future
+      // features. It is not currently wired to any UI — backup/restore
+      // use local JSON files instead.
+      window.firebaseApp = app;
+      window.firebaseDb = db;
     </script>
 
     <style>
@@ -1142,72 +1007,6 @@
             background: var(--danger);
             box-shadow: none;
         }
-
-        /* --- App Splash Screen (shown while Firebase resolves auth state) --- */
-        #app-loader {
-            z-index: 400;
-            align-items: center;
-            justify-content: center;
-            background: var(--primary-gradient);
-            gap: 20px;
-        }
-
-        .splash-logo {
-            width: 88px;
-            height: 88px;
-            border-radius: 26px;
-            background: rgba(255, 255, 255, 0.16);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            animation: splashPulse 1.6s ease-in-out infinite;
-        }
-
-        .splash-logo .material-icons-round {
-            font-size: 44px;
-            color: #FFFFFF;
-        }
-
-        .splash-text {
-            text-align: center;
-        }
-
-        .splash-title {
-            font-size: 26px;
-            font-weight: 900;
-            color: #FFFFFF;
-            letter-spacing: -0.5px;
-            margin: 0;
-        }
-
-        .splash-subtitle {
-            font-size: 11px;
-            font-weight: 700;
-            color: rgba(255, 255, 255, 0.85);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-top: 6px;
-        }
-
-        .splash-spinner {
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-top-color: #FFFFFF;
-            animation: spin 0.8s linear infinite;
-            margin-top: 12px;
-        }
-
-        @keyframes splashPulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.06); }
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
@@ -1381,20 +1180,17 @@
                     </div>
 
                     <div class="card-panel">
-                        <p class="card-panel-title">User</p>
-                        <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Signed in as <strong id="account-email">—</strong></p>
+                        <p class="card-panel-title">Backup & Restore</p>
+                        <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Save your invoices and settings to a file, or restore from a previous backup.</p>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <button type="button" id="backup-btn" onclick="window.backupToCloud()" class="btn-action btn-pdf btn-action-lg">
-                                <span class="material-icons-round" style="font-size: 16px;">cloud_upload</span> Backup
+                            <button type="button" id="backup-btn" onclick="backupToFile()" class="btn-action btn-pdf btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">download</span> Backup
                             </button>
-                            <button type="button" id="restore-btn" onclick="window.restoreFromCloud()" class="btn-action btn-edit btn-action-lg">
-                                <span class="material-icons-round" style="font-size: 16px;">cloud_download</span> Restore
+                            <button type="button" id="restore-btn" onclick="triggerRestoreFile()" class="btn-action btn-edit btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">upload</span> Restore
                             </button>
                         </div>
-
-                        <button type="button" onclick="confirmLogout()" class="btn-submit" style="background: var(--danger); box-shadow: none; margin-top: 16px;">
-                            <span class="material-icons-round">logout</span> Log Out
-                        </button>
+                        <input type="file" id="restore-file-input" accept="application/json,.json" class="hidden" onchange="handleRestoreFile(event)">
                     </div>
                 </form>
             </div>
@@ -1410,53 +1206,6 @@
             </div>
             <div class="overlay-body" id="view-content">
                 <!-- Injected by renderViewScreen() -->
-            </div>
-        </div>
-
-        <!-- APP SPLASH SCREEN (shown while Firebase resolves auth state) -->
-        <div id="app-loader" class="full-screen-overlay">
-            <div class="splash-logo">
-                <span class="material-icons-round">receipt_long</span>
-            </div>
-            <div class="splash-text">
-                <h1 class="splash-title">BillBook</h1>
-                <p class="splash-subtitle">Smart Invoicing</p>
-            </div>
-            <div class="splash-spinner"></div>
-        </div>
-
-        <!-- AUTH SCREEN (Login / Signup Gate, shown on load until signed in) -->
-        <div id="auth-screen" class="full-screen-overlay hidden" style="z-index: 300;">
-            <div class="overlay-body" style="display: flex; flex-direction: column; justify-content: center;">
-                <div style="text-align: center; margin-bottom: 32px;">
-                    <div class="brand-logo" style="margin: 0 auto 16px auto;">
-                        <span class="material-icons-round">receipt_long</span>
-                    </div>
-                    <h1 class="brand-title" style="font-size: 24px;">BillBook</h1>
-                    <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 600; margin-top: 4px;">Sign in to manage your invoices</p>
-                </div>
-
-                <div id="auth-error" class="hidden" style="background-color: var(--danger-container); color: var(--on-danger-container); font-size: 12px; font-weight: 700; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px; text-align: center;"></div>
-
-                <form id="auth-form" onsubmit="handleAuthSubmit(event)">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input type="email" id="auth-email" required class="form-control" placeholder="you@example.com" autocomplete="email">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" id="auth-password" required minlength="6" class="form-control" placeholder="••••••••" autocomplete="current-password">
-                    </div>
-
-                    <button type="submit" id="auth-submit-btn" class="btn-submit" style="margin-top: 8px;">
-                        <span class="material-icons-round">login</span> <span id="auth-submit-label">Login</span>
-                    </button>
-                </form>
-
-                <p style="text-align: center; font-size: 12px; font-weight: 600; color: var(--on-surface-variant); margin-top: 20px;">
-                    <span id="auth-toggle-text">Don't have an account?</span>
-                    <a href="javascript:void(0)" onclick="toggleAuthMode()" id="auth-toggle-link" style="color: var(--primary); font-weight: 800; text-decoration: none;">Sign Up</a>
-                </p>
             </div>
         </div>
 
@@ -1515,29 +1264,6 @@
 
     <!-- JavaScript Controllers -->
     <script>
-        // --- Core Application Storage State ---
-        let authMode = 'login';
-
-        function toggleAuthMode() {
-            authMode = authMode === 'login' ? 'signup' : 'login';
-            const isLogin = authMode === 'login';
-            document.getElementById('auth-submit-label').innerText = isLogin ? 'Login' : 'Sign Up';
-            document.getElementById('auth-toggle-text').innerText = isLogin ? "Don't have an account?" : "Already have an account?";
-            document.getElementById('auth-toggle-link').innerText = isLogin ? 'Sign Up' : 'Login';
-            const errorEl = document.getElementById('auth-error');
-            errorEl.innerText = '';
-            errorEl.classList.add('hidden');
-        }
-
-        function handleAuthSubmit(e) {
-            e.preventDefault();
-            if (authMode === 'login') {
-                window.loginUser();
-            } else {
-                window.signupUser();
-            }
-        }
-
         // --- App-Native Alert / Confirm (replaces browser alert()/confirm()) ---
         function showAppModal(message, { icon = 'info', danger = false, showCancel = false, confirmLabel = 'OK', cancelLabel = 'Cancel' } = {}) {
             return new Promise((resolve) => {
@@ -1580,17 +1306,6 @@
             return showAppModal(message, { ...options, showCancel: true, confirmLabel: options.confirmLabel || 'Confirm', cancelLabel: options.cancelLabel || 'Cancel' });
         }
 
-        async function confirmLogout() {
-            const confirmed = await showAppConfirm("Are you sure you want to log out?", {
-                icon: 'logout',
-                danger: true,
-                confirmLabel: 'Log Out'
-            });
-            if (confirmed) {
-                window.logoutUser();
-            }
-        }
-
         let bills = JSON.parse(localStorage.getItem('bills')) || [];
         let shopSettings = JSON.parse(localStorage.getItem('billbook_settings')) || {
             name: 'BillBook Retailers',
@@ -1614,7 +1329,7 @@
             document.getElementById('shop-phone').value = shopSettings.phone;
         }
 
-        // --- Bridge functions for the Firestore backup/restore module script ---
+        // --- Local Data Backup / Restore Helpers ---
         function getBackupPayload() {
             return { bills, shopSettings };
         }
@@ -1626,6 +1341,55 @@
             localStorage.setItem('billbook_settings', JSON.stringify(shopSettings));
             initShopSettingsForm();
             renderBillsList();
+        }
+
+        function backupToFile() {
+            const payload = getBackupPayload();
+            const dataStr = JSON.stringify(payload, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const dateStr = new Date().toISOString().slice(0, 10);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `billbook-backup-${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function triggerRestoreFile() {
+            document.getElementById('restore-file-input').click();
+        }
+
+        async function handleRestoreFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+
+                if (!data || !Array.isArray(data.bills)) {
+                    await showAppAlert("This file doesn't look like a valid BillBook backup.", { icon: 'error_outline', danger: true });
+                    return;
+                }
+
+                const confirmed = await showAppConfirm("This will replace your current local data with the selected backup file. Continue?", {
+                    icon: 'file_upload',
+                    confirmLabel: 'Restore'
+                });
+
+                if (confirmed) {
+                    applyRestoredData({ bills: data.bills, shopSettings: data.shopSettings || null });
+                    await showAppAlert("Restore completed successfully.", { icon: 'check_circle' });
+                }
+            } catch (err) {
+                await showAppAlert("Failed to read backup file: " + err.message, { icon: 'error_outline', danger: true });
+            } finally {
+                event.target.value = '';
+            }
         }
 
         function generateBillNumber() {
