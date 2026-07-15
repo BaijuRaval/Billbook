@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>License Generator</title>
+<style>
+body{font-family:Arial,sans-serif;background:#111827;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0}
+.card{background:#1f2937;padding:24px;border-radius:12px;width:420px}
+button{width:100%;padding:12px;font-size:16px;border:none;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer}
+pre{background:#0b1220;padding:10px;border-radius:8px;white-space:pre-wrap;max-height:300px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>License Generator</h2>
+<button onclick="createKeys()">Create 10 Keys</button>
+<pre id="out"></pre>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC3rdFLymcNpe7TwWLlhM9PLKi-nIDi-n0",
+  authDomain: "billbook-efe3f.firebaseapp.com",
+  projectId: "billbook-efe3f",
+  storageBucket: "billbook-efe3f.firebasestorage.app",
+  messagingSenderId: "601890572433",
+  appId: "1:601890572433:web:786e37690fd5fe0fe09730",
+  measurementId: "G-JTN29M9X65"
+};
+
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+function block(n){
+ const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+ let s="";
+ for(let i=0;i<n;i++) s+=c[Math.floor(Math.random()*c.length)];
+ return s;
+}
+
+function key(){
+ return `${block(4)}-${block(4)}-${block(4)}`;
+}
+
+window.createKeys = async function(){
+ const out=document.getElementById("out");
+ out.textContent="Creating...";
+ let list=[];
+ for(let i=0;i<10;i++){
+   let k=key();
+   await setDoc(doc(db,"licenses",k),{status:"available"});
+   list.push(k);
+ }
+ out.textContent="Created 10 Keys\n\n"+list.join("\n");
+}
+</script>
+</body>
+</html>
