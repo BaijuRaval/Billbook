@@ -392,7 +392,7 @@
         <div class="app-modal-card">
             <div class="app-modal-icon-wrap"><span class="material-icons-round">restore</span></div>
             <h3 class="app-modal-title">Reactivate This Key?</h3>
-            <p class="app-modal-message" id="reactivate-modal-key">This clears the expired status and any scheduled expiry date, so the key can be used again.</p>
+            <p class="app-modal-message" id="reactivate-modal-key">This clears the scheduled expiry date and sets the key's status back to used.</p>
             <div class="app-modal-actions">
                 <button class="app-modal-btn app-modal-btn-cancel" onclick="closeReactivateModal()">Cancel</button>
                 <button class="app-modal-btn app-modal-btn-confirm" onclick="confirmReactivate()">Reactivate</button>
@@ -641,7 +641,7 @@ window.confirmExpireNow = async function () {
 
 window.openReactivateModal = function (key) {
     pendingKey = key;
-    document.getElementById('reactivate-modal-key').textContent = `This clears the expired status on ${key} and removes its scheduled expiry date, so it can be used again.`;
+    document.getElementById('reactivate-modal-key').textContent = `This clears the scheduled expiry date on ${key} and sets its status back to used.`;
     document.getElementById('reactivate-modal').classList.remove('hidden');
 };
 
@@ -652,10 +652,8 @@ window.closeReactivateModal = function () {
 
 window.confirmReactivate = async function () {
     if (!pendingKey) return;
-    const k = allKeys.find(x => x.key === pendingKey);
-    const restoreStatus = (k && k.previousStatus) ? k.previousStatus : 'available';
     await setDoc(doc(db, "licenses", pendingKey), {
-        status: restoreStatus,
+        status: 'used',
         expiresAt: deleteField(),
         previousStatus: deleteField()
     }, { merge: true });
