@@ -37,11 +37,81 @@
       const analytics = getAnalytics(app);
       const db = getFirestore(app);
 
-      // Firestore is initialized and ready (window.firebaseDb) for future
-      // features. It is not currently wired to any UI — backup/restore
-      // use local JSON files instead.
       window.firebaseApp = app;
       window.firebaseDb = db;
+
+      // --- License Management (Firestore is used ONLY for this) ---
+      // Collection: licenses | Document ID = License Key
+      // Fields: status ('available' | 'used' | 'expired'), mobile, activatedAt
+
+      window.firestoreActivateLicense = async function (mobile, key) {
+        try {
+          const ref = doc(db, 'licenses', key);
+          const snap = await getDoc(ref);
+
+          if (!snap.exists()) {
+            return { ok: false, message: 'Invalid License Key.' };
+          }
+
+          const data = snap.data();
+
+          if (data.status === 'expired') {
+            return { ok: false, message: 'License Expired.' };
+          }
+
+          if (data.status === 'used') {
+            if (data.mobile !== mobile) {
+              return { ok: false, message: 'Invalid Licence Key.' };
+            }
+            // Same license, same mobile — reactivating (e.g. reinstall).
+            return { ok: true };
+          }
+
+          if (data.status === 'available') {
+            await setDoc(ref, {
+              status: 'used',
+              mobile: mobile,
+              activatedAt: serverTimestamp()
+            }, { merge: true });
+            return { ok: true };
+          }
+
+          return { ok: false, message: 'Invalid License Key.' };
+        } catch (err) {
+          return {
+            ok: false,
+            message: 'Could not reach the license server. Please check your internet connection and try again.',
+            networkError: true
+          };
+        }
+      };
+
+      window.firestoreCheckLicense = async function (key, mobile) {
+        try {
+          const ref = doc(db, 'licenses', key);
+          const snap = await getDoc(ref);
+
+          if (!snap.exists()) {
+            return { valid: false, offline: false };
+          }
+
+          const data = snap.data();
+
+          if (data.status === 'expired') {
+            return { valid: false, offline: false };
+          }
+
+          if (data.mobile !== mobile) {
+            return { valid: false, offline: false };
+          }
+
+          return { valid: true, offline: false };
+        } catch (err) {
+          // Firestore unreachable (most likely no internet) — fail open,
+          // trust the locally stored activation for this launch.
+          return { valid: true, offline: true };
+        }
+      };
     </script>
 
     <style>
@@ -1007,6 +1077,95 @@
             background: var(--danger);
             box-shadow: none;
         }
+
+        /* --- App Splash / Loader (shown briefly during license check) --- */
+        #app-loader {
+            z-index: 800;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-gradient);
+            gap: 20px;
+        }
+
+        .splash-logo {
+            width: 88px;
+            height: 88px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.16);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            animation: splashPulse 1.6s ease-in-out infinite;
+        }
+
+        .splash-logo .material-icons-round {
+            font-size: 44px;
+            color: #FFFFFF;
+        }
+
+        .splash-text {
+            text-align: center;
+        }
+
+        .splash-title {
+            font-size: 26px;
+            font-weight: 900;
+            color: #FFFFFF;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+
+        .splash-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.85);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 6px;
+        }
+
+        .splash-spinner {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #FFFFFF;
+            animation: spin 0.8s linear infinite;
+            margin-top: 12px;
+        }
+
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* --- License Activation Screen --- */
+        #activation-screen {
+            z-index: 700;
+        }
+
+        .trial-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            border: 1px solid var(--primary-container);
+            background-color: transparent;
+            color: var(--primary);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .trial-btn:active {
+            background-color: var(--primary-container);
+        }
     </style>
 </head>
 <body>
@@ -1209,6 +1368,52 @@
             </div>
         </div>
 
+        <!-- APP SPLASH / LOADER (shown briefly while license status is verified) -->
+        <div id="app-loader" class="full-screen-overlay">
+            <div class="splash-logo">
+                <span class="material-icons-round">receipt_long</span>
+            </div>
+            <div class="splash-text">
+                <h1 class="splash-title">BillBook</h1>
+                <p class="splash-subtitle">Smart Invoicing</p>
+            </div>
+            <div class="splash-spinner"></div>
+        </div>
+
+        <!-- LICENSE ACTIVATION SCREEN -->
+        <div id="activation-screen" class="full-screen-overlay hidden">
+            <div class="overlay-body" style="display: flex; flex-direction: column; justify-content: center;">
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div class="brand-logo" style="margin: 0 auto 16px auto; background: var(--primary-gradient);">
+                        <span class="material-icons-round" style="color: #FFFFFF;">receipt_long</span>
+                    </div>
+                    <h1 class="brand-title" style="font-size: 24px; color: var(--on-surface);">Activate BillBook</h1>
+                    <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 600; margin-top: 4px;">Enter your license details to continue</p>
+                </div>
+
+                <div id="activation-error" class="hidden" style="background-color: var(--danger-container); color: var(--on-danger-container); font-size: 12px; font-weight: 700; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px; text-align: center;"></div>
+
+                <form id="activation-form" onsubmit="handleActivate(event)">
+                    <div class="form-group">
+                        <label class="form-label">Mobile Number *</label>
+                        <input type="tel" id="activation-mobile" required class="form-control" placeholder="9876543210" autocomplete="tel">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">License Key</label>
+                        <input type="text" id="activation-key" class="form-control" placeholder="XXXX-XXXX-XXXX" autocomplete="off">
+                    </div>
+
+                    <button type="submit" id="activation-submit-btn" class="btn-submit" style="margin-top: 8px;">
+                        <span class="material-icons-round">verified</span> Activate
+                    </button>
+                </form>
+
+                <button type="button" onclick="startFreeTrial()" class="trial-btn">
+                    Start 1 Day Free Trial
+                </button>
+            </div>
+        </div>
+
         <!-- Floating Action Button (FAB) -->
         <button id="fab-add" onclick="navigateToForm()">
             <span class="material-icons-round">add</span>
@@ -1321,7 +1526,137 @@
             setupSearchEngine();
             document.getElementById('bill-date').valueAsDate = new Date();
             history.replaceState({ screen: 'list' }, '', '');
+            bootLicenseCheck();
         });
+
+        // --- License Activation & Validation (Firestore used ONLY for licensing) ---
+        const LICENSE_KEYS = {
+            activated: 'billbookActivated',
+            mobile: 'activatedMobile',
+            key: 'activatedKey',
+            trialUsed: 'billbookTrialUsed',
+            trialStart: 'billbookTrialStart'
+        };
+        const TRIAL_DURATION_MS = 24 * 60 * 60 * 1000;
+
+        function clearLocalActivation() {
+            localStorage.removeItem(LICENSE_KEYS.activated);
+            localStorage.removeItem(LICENSE_KEYS.mobile);
+            localStorage.removeItem(LICENSE_KEYS.key);
+        }
+
+        function isTrialUsed() {
+            return localStorage.getItem(LICENSE_KEYS.trialUsed) === 'true';
+        }
+
+        function isTrialActive() {
+            if (!isTrialUsed()) return false;
+            const start = parseInt(localStorage.getItem(LICENSE_KEYS.trialStart), 10);
+            if (!start) return false;
+            return (Date.now() - start) < TRIAL_DURATION_MS;
+        }
+
+        function showActivationScreen(message) {
+            document.getElementById('app-loader').classList.add('hidden');
+            document.getElementById('activation-screen').classList.remove('hidden');
+            const errEl = document.getElementById('activation-error');
+            if (message) {
+                errEl.innerText = message;
+                errEl.classList.remove('hidden');
+            } else {
+                errEl.innerText = '';
+                errEl.classList.add('hidden');
+            }
+        }
+
+        function showActivationError(message) {
+            const errEl = document.getElementById('activation-error');
+            errEl.innerText = message;
+            errEl.classList.remove('hidden');
+        }
+
+        function openApp() {
+            document.getElementById('app-loader').classList.add('hidden');
+            document.getElementById('activation-screen').classList.add('hidden');
+        }
+
+        async function bootLicenseCheck() {
+            const activated = localStorage.getItem(LICENSE_KEYS.activated) === 'true';
+
+            if (activated) {
+                const key = localStorage.getItem(LICENSE_KEYS.key);
+                const mobile = localStorage.getItem(LICENSE_KEYS.mobile);
+                const result = await window.firestoreCheckLicense(key, mobile);
+
+                if (!result.valid) {
+                    clearLocalActivation();
+                    showActivationScreen('License Expired or Disabled.');
+                    return;
+                }
+
+                // Valid — either confirmed online, or offline and trusting
+                // the local activation (rechecked automatically next launch).
+                openApp();
+                return;
+            }
+
+            if (isTrialActive()) {
+                openApp();
+                return;
+            }
+
+            if (isTrialUsed()) {
+                showActivationScreen('Your free trial has expired. Please activate a license.');
+                return;
+            }
+
+            showActivationScreen();
+        }
+
+        function setActivationLoading(isLoading) {
+            const btn = document.getElementById('activation-submit-btn');
+            if (btn) btn.disabled = isLoading;
+        }
+
+        async function handleActivate(e) {
+            e.preventDefault();
+            const mobile = document.getElementById('activation-mobile').value.trim();
+            const key = document.getElementById('activation-key').value.trim();
+
+            if (!mobile) {
+                showActivationError('Please enter your mobile number.');
+                return;
+            }
+            if (!key) {
+                showActivationError('Please enter your license key.');
+                return;
+            }
+
+            setActivationLoading(true);
+            const result = await window.firestoreActivateLicense(mobile, key);
+            setActivationLoading(false);
+
+            if (!result.ok) {
+                showActivationError(result.message);
+                return;
+            }
+
+            localStorage.setItem(LICENSE_KEYS.activated, 'true');
+            localStorage.setItem(LICENSE_KEYS.mobile, mobile);
+            localStorage.setItem(LICENSE_KEYS.key, key);
+
+            openApp();
+        }
+
+        function startFreeTrial() {
+            if (isTrialUsed()) {
+                showActivationError("You've already used your free trial. Please activate a license to continue.");
+                return;
+            }
+            localStorage.setItem(LICENSE_KEYS.trialUsed, 'true');
+            localStorage.setItem(LICENSE_KEYS.trialStart, String(Date.now()));
+            openApp();
+        }
 
         function initShopSettingsForm() {
             document.getElementById('shop-name').value = shopSettings.name;
