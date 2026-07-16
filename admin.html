@@ -226,6 +226,9 @@
     .btn-expire { background-color: var(--danger-container); color: var(--on-danger-container); }
     .btn-expire:active { background-color: #F4D0C2; }
 
+    .btn-reactivate { background-color: var(--success-container); color: var(--on-success-container); }
+    .btn-reactivate:active { background-color: #C3E9CF; }
+
     .btn-action:disabled { opacity: 0.5; cursor: default; }
 
     /* Empty state */
@@ -360,8 +363,8 @@
     <div id="expiry-modal" class="app-modal-overlay hidden">
         <div class="app-modal-card">
             <div class="app-modal-icon-wrap"><span class="material-icons-round">schedule</span></div>
-            <h3 class="app-modal-title">Set Expiry</h3>
-            <p class="app-modal-message" id="expiry-modal-key">Choose an expiry date & time for this key.</p>
+            <h3 class="app-modal-title">Schedule Expiry Date</h3>
+            <p class="app-modal-message" id="expiry-modal-key">This key will auto-expire at the date & time you choose below.</p>
             <label class="form-label">Expiry Date & Time</label>
             <input type="datetime-local" id="expiry-input" class="form-control">
             <div class="app-modal-actions">
@@ -375,11 +378,24 @@
     <div id="confirm-modal" class="app-modal-overlay hidden">
         <div class="app-modal-card">
             <div class="app-modal-icon-wrap danger"><span class="material-icons-round">block</span></div>
-            <h3 class="app-modal-title">Expire this key?</h3>
-            <p class="app-modal-message" id="confirm-modal-key">This will immediately mark the key as expired.</p>
+            <h3 class="app-modal-title">Expire This Key Now?</h3>
+            <p class="app-modal-message" id="confirm-modal-key">This blocks the key immediately, regardless of any scheduled expiry date. You can reactivate it later.</p>
             <div class="app-modal-actions">
                 <button class="app-modal-btn app-modal-btn-cancel" onclick="closeConfirmModal()">Cancel</button>
                 <button class="app-modal-btn app-modal-btn-confirm danger" onclick="confirmExpireNow()">Expire Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reactivate Modal -->
+    <div id="reactivate-modal" class="app-modal-overlay hidden">
+        <div class="app-modal-card">
+            <div class="app-modal-icon-wrap"><span class="material-icons-round">restore</span></div>
+            <h3 class="app-modal-title">Reactivate This Key?</h3>
+            <p class="app-modal-message" id="reactivate-modal-key">This clears the expired status and any scheduled expiry date, so the key can be used again.</p>
+            <div class="app-modal-actions">
+                <button class="app-modal-btn app-modal-btn-cancel" onclick="closeReactivateModal()">Cancel</button>
+                <button class="app-modal-btn app-modal-btn-confirm" onclick="confirmReactivate()">Reactivate</button>
             </div>
         </div>
     </div>
@@ -394,7 +410,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
 import {
-    getFirestore, doc, setDoc, getDocs, collection, Timestamp
+    getFirestore, doc, setDoc, getDocs, collection, Timestamp, deleteField
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -456,10 +472,11 @@ window.loadKeys = async function () {
         const expiresAt = tsToDate(data.expiresAt);
         let status = data.status || 'available';
 
-        // Auto-flip to expired if past due
+        // Auto-flip to expired if past due (remember prior status so it can be reactivated)
         if (expiresAt && expiresAt <= now && status !== 'expired') {
+            updates.push(setDoc(doc(db, "licenses", d.id), { status: 'expired', previousStatus: status }, { merge: true }));
+            data.previousStatus = status;
             status = 'expired';
-            updates.push(setDoc(doc(db, "licenses", d.id), { status: 'expired' }, { merge: true }));
         }
 
         allKeys.push({
@@ -468,7 +485,8 @@ window.loadKeys = async function () {
             mobile: data.mobile || null,
             activatedAt: data.activatedAt || null,
             expiresAt: data.expiresAt || null,
-            createdAt: data.createdAt || null
+            createdAt: data.createdAt || null,
+            previousStatus: data.previousStatus || null
         });
     });
 
@@ -539,12 +557,16 @@ window.renderKeys = function () {
                 <button class="btn-action btn-copy" onclick="copyKey('${k.key}')">
                     <span class="material-icons-round">content_copy</span>Copy
                 </button>
-                <button class="btn-action btn-expiry" onclick="openExpiryModal('${k.key}')" ${isExpired ? 'disabled' : ''}>
-                    <span class="material-icons-round">schedule</span>Expiry
+                ${isExpired ? `
+                <button class="btn-action btn-reactivate" onclick="openReactivateModal('${k.key}')">
+                    <span class="material-icons-round">restore</span>Reactivate
+                </button>` : `
+                <button class="btn-action btn-expiry" onclick="openExpiryModal('${k.key}')">
+                    <span class="material-icons-round">schedule</span>Expiry Date
                 </button>
-                <button class="btn-action btn-expire" onclick="openConfirmModal('${k.key}')" ${isExpired ? 'disabled' : ''}>
-                    <span class="material-icons-round">block</span>Expire
-                </button>
+                <button class="btn-action btn-expire" onclick="openConfirmModal('${k.key}')">
+                    <span class="material-icons-round">block</span>Expire Now
+                </button>`}
             </div>
         </div>`;
     }).join('');
@@ -609,9 +631,36 @@ window.closeConfirmModal = function () {
 
 window.confirmExpireNow = async function () {
     if (!pendingKey) return;
-    await setDoc(doc(db, "licenses", pendingKey), { status: 'expired' }, { merge: true });
+    const k = allKeys.find(x => x.key === pendingKey);
+    const previousStatus = (k && k.status !== 'expired') ? k.status : 'available';
+    await setDoc(doc(db, "licenses", pendingKey), { status: 'expired', previousStatus }, { merge: true });
     closeConfirmModal();
     showToast('Key expired');
+    loadKeys();
+};
+
+window.openReactivateModal = function (key) {
+    pendingKey = key;
+    document.getElementById('reactivate-modal-key').textContent = `This clears the expired status on ${key} and removes its scheduled expiry date, so it can be used again.`;
+    document.getElementById('reactivate-modal').classList.remove('hidden');
+};
+
+window.closeReactivateModal = function () {
+    pendingKey = null;
+    document.getElementById('reactivate-modal').classList.add('hidden');
+};
+
+window.confirmReactivate = async function () {
+    if (!pendingKey) return;
+    const k = allKeys.find(x => x.key === pendingKey);
+    const restoreStatus = (k && k.previousStatus) ? k.previousStatus : 'available';
+    await setDoc(doc(db, "licenses", pendingKey), {
+        status: restoreStatus,
+        expiresAt: deleteField(),
+        previousStatus: deleteField()
+    }, { merge: true });
+    closeReactivateModal();
+    showToast('Key reactivated');
     loadKeys();
 };
 
