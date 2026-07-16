@@ -689,6 +689,7 @@ window.confirmReset = async function () {
     showToast('Key reset to available');
     loadKeys();
 };
+window.openReactivateModal = function (key) {
     pendingKey = key;
     document.getElementById('reactivate-modal-key').textContent = `This clears the scheduled expiry date on ${key} and sets its status back to used.`;
     document.getElementById('reactivate-modal').classList.remove('hidden');
