@@ -270,13 +270,85 @@
             margin-top: 4px;
         }
 
-        .bill-counter {
-            font-size: 11px;
-            font-weight: 700;
-            background-color: #76B5C5;
+        /* --- Stats Pill Row (bill count + total amount) --- */
+        .stats-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-pill {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--primary-container);
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--primary);
+            box-shadow: 0 2px 10px rgba(6, 57, 112, 0.06);
+        }
+
+        .stat-pill .material-icons-round {
+            font-size: 16px;
+        }
+
+        .stat-pill-total {
+            background: var(--primary-gradient);
             color: #FFFFFF;
-            padding: 6px 14px;
-            border-radius: 20px;
+            border-color: transparent;
+        }
+
+        /* --- Date Range Filter Row --- */
+        .date-filter-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 16px;
+        }
+
+        .date-filter-field {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .date-filter-label {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--on-surface-variant);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .date-filter-row .form-control {
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        .date-filter-clear {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            border: 1px solid var(--primary-container);
+            background-color: var(--card-bg);
+            color: var(--on-surface-variant);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: var(--transition-smooth);
+        }
+
+        .date-filter-clear:active {
+            background-color: var(--primary-container);
+            color: var(--primary);
         }
 
         /* Search Bar */
@@ -1192,7 +1264,6 @@
                     </div>
                     <div style="display:flex;flex-direction:column;align-items:flex-start;">
                         <h1 class="brand-title">BillBook</h1>
-                        <div id="bill-counter" class="bill-counter" style="margin-top:6px;">0 Bills</div>
                     </div>
                 </div>
 
@@ -1205,9 +1276,34 @@
         <!-- Dynamic Main Scroll Area -->
         <main class="content-area">
 
+            <div id="stats-row" class="stats-row">
+                <div class="stat-pill">
+                    <span class="material-icons-round">receipt_long</span>
+                    <span id="bill-counter">0 Bills</span>
+                </div>
+                <div class="stat-pill stat-pill-total">
+                    <span class="material-icons-round">payments</span>
+                    <span id="total-amount-counter">₹0.00</span>
+                </div>
+            </div>
+
             <div id="search-bar-container" class="search-container" style="margin-bottom: 16px;">
                 <span class="material-icons-round search-icon">search</span>
                 <input type="text" id="search-input" placeholder="Search customer or invoice..." style="box-sizing:border-box;">
+            </div>
+
+            <div id="date-filter-row" class="date-filter-row">
+                <div class="date-filter-field">
+                    <label class="date-filter-label">From</label>
+                    <input type="date" id="filter-date-from" class="form-control">
+                </div>
+                <div class="date-filter-field">
+                    <label class="date-filter-label">To</label>
+                    <input type="date" id="filter-date-to" class="form-control">
+                </div>
+                <button type="button" id="clear-date-filter-btn" onclick="clearDateFilter()" class="date-filter-clear hidden" title="Clear date filter">
+                    <span class="material-icons-round">close</span>
+                </button>
             </div>
 
             <!-- LIST SCREEN -->
@@ -1679,19 +1775,29 @@
         }
 
         function backupToFile() {
-            const payload = getBackupPayload();
-            const dataStr = JSON.stringify(payload, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const dateStr = new Date().toISOString().slice(0, 10);
+            try {
+                const payload = getBackupPayload();
+                const dataStr = JSON.stringify(payload, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const dateStr = new Date().toISOString().slice(0, 10);
 
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `billbook-backup-${dateStr}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `billbook-backup-${dateStr}.json`;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+
+                // Revoking the object URL synchronously can cancel the download
+                // before it starts on some mobile browsers/webviews, so defer it.
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            } catch (err) {
+                showAppAlert("Backup failed: " + err.message, { icon: 'error_outline', danger: true });
+            }
         }
 
         function triggerRestoreFile() {
@@ -1733,9 +1839,29 @@
 
         function setupSearchEngine() {
             document.getElementById('search-input').addEventListener('input', (e) => {
-                const query = e.target.value.toLowerCase().trim();
-                renderBillsList(query);
+                renderBillsList(e.target.value.toLowerCase().trim());
             });
+            document.getElementById('filter-date-from').addEventListener('change', () => {
+                updateDateFilterClearButton();
+                renderBillsList(document.getElementById('search-input').value.toLowerCase().trim());
+            });
+            document.getElementById('filter-date-to').addEventListener('change', () => {
+                updateDateFilterClearButton();
+                renderBillsList(document.getElementById('search-input').value.toLowerCase().trim());
+            });
+        }
+
+        function updateDateFilterClearButton() {
+            const from = document.getElementById('filter-date-from').value;
+            const to = document.getElementById('filter-date-to').value;
+            document.getElementById('clear-date-filter-btn').classList.toggle('hidden', !from && !to);
+        }
+
+        function clearDateFilter() {
+            document.getElementById('filter-date-from').value = '';
+            document.getElementById('filter-date-to').value = '';
+            updateDateFilterClearButton();
+            renderBillsList(document.getElementById('search-input').value.toLowerCase().trim());
         }
 
         // --- Mobile / Hardware Back Button Support ---
@@ -2030,6 +2156,9 @@
             const list = document.getElementById('bills-list');
             list.innerHTML = '';
 
+            const dateFrom = document.getElementById('filter-date-from').value;
+            const dateTo = document.getElementById('filter-date-to').value;
+
             const filtered = bills.filter(b => {
                 const pattern = [
                     b.customerName,
@@ -2040,10 +2169,16 @@
                     b.grandTotal.toFixed(2),
                     b.grandTotal.toString()
                 ].join(' ').toLowerCase();
-                return pattern.includes(query);
+
+                if (!pattern.includes(query)) return false;
+                if (dateFrom && b.date < dateFrom) return false;
+                if (dateTo && b.date > dateTo) return false;
+                return true;
             });
 
-            document.getElementById('bill-counter').innerText = `${bills.length} Bill${bills.length !== 1 ? 's' : ''}`;
+            const filteredTotal = filtered.reduce((sum, b) => sum + b.grandTotal, 0);
+            document.getElementById('bill-counter').innerText = `${filtered.length} Bill${filtered.length !== 1 ? 's' : ''}`;
+            document.getElementById('total-amount-counter').innerText = `₹${filteredTotal.toFixed(2)}`;
 
             if (filtered.length === 0) {
                 document.getElementById('empty-state').classList.remove('hidden');
