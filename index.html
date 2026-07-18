@@ -1537,6 +1537,14 @@
                         <input type="file" id="restore-file-input" accept="application/json,.json" class="hidden" onchange="handleRestoreFile(event)">
                     </div>
                 </form>
+
+                <div class="card-panel" style="border: 1px solid var(--danger-container);">
+                    <p class="card-panel-title" style="color: var(--danger);">Danger Zone</p>
+                    <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Permanently erases all invoices, customers, products, and shop settings from this device. Backup your data first — this cannot be undone.</p>
+                    <button type="button" onclick="resetAllData()" class="btn-submit" style="background: var(--danger); box-shadow: none;">
+                        <span class="material-icons-round">delete_forever</span> Reset All Data
+                    </button>
+                </div>
             </div>
 
         </main>
@@ -2096,6 +2104,44 @@
             } finally {
                 event.target.value = '';
             }
+        }
+
+        async function resetAllData() {
+            const confirmed = await showAppConfirm("This will permanently delete ALL invoices, customers, products, and shop settings from this device. This cannot be undone. Continue?", {
+                icon: 'delete_forever',
+                danger: true,
+                confirmLabel: 'Reset Everything'
+            });
+            if (!confirmed) return;
+
+            const doubleConfirmed = await showAppConfirm("Are you absolutely sure? This is your last chance to back out.", {
+                icon: 'warning',
+                danger: true,
+                confirmLabel: 'Yes, Delete Everything'
+            });
+            if (!doubleConfirmed) return;
+
+            localStorage.removeItem('bills');
+            localStorage.removeItem('customers');
+            localStorage.removeItem('products');
+            localStorage.removeItem('billbook_settings');
+            localStorage.removeItem('billbook_invoice_date_key');
+            localStorage.removeItem('billbook_invoice_counter');
+
+            bills = [];
+            customers = [];
+            products = [];
+            shopSettings = {
+                name: 'BillBook Retailers',
+                address: '123 Market Road, New Delhi',
+                phone: '+91 98765 43210'
+            };
+
+            initShopSettingsForm();
+            renderBillsList();
+
+            await showAppAlert("All data has been reset.", { icon: 'check_circle' });
+            navigateToList();
         }
 
         function getBillCounterState() {
@@ -2987,7 +3033,9 @@
                     </div>
                     <div class="view-row">
                         <span class="view-row-label">Phone</span>
-                        <span class="view-row-value">${customer.phone || 'N/A'}</span>
+                        <span class="view-row-value">${customer.phone
+                            ? `<a href="https://wa.me/${customer.phone.replace(/\D/g, '')}" target="_blank" rel="noopener" style="color: #25D366; text-decoration: none; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-round" style="font-size: 16px;">chat</span>${customer.phone}</a>`
+                            : 'N/A'}</span>
                     </div>
                 </div>
 
