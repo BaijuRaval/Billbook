@@ -1028,15 +1028,6 @@
             font-weight: 500;
         }
 
-        /* --- Content Screen Section Title (Customers / Products / Settings) --- */
-        .content-screen-title {
-            font-size: 20px;
-            font-weight: 900;
-            color: var(--on-surface);
-            letter-spacing: -0.3px;
-            margin: 0 0 16px 0;
-        }
-
         /* --- Android Home Indicator Simulation --- */
         .simulator-home-pill {
             display: none;
@@ -1421,7 +1412,7 @@
                         <span class="material-icons-round">receipt_long</span>
                     </div>
                     <div style="display:flex;flex-direction:column;align-items:flex-start;">
-                        <h1 class="brand-title">BillBook</h1>
+                        <h1 id="header-title" class="brand-title">BillBook</h1>
                     </div>
                 </div>
             </div>
@@ -1476,7 +1467,6 @@
 
             <!-- CUSTOMERS SCREEN -->
             <div id="customers-screen" class="hidden">
-                <p class="content-screen-title">Customers</p>
                 <div class="search-container" style="margin-bottom: 16px;">
                     <span class="material-icons-round search-icon">search</span>
                     <input type="text" id="customer-search-input" placeholder="Search customers..." style="box-sizing:border-box;" oninput="renderCustomersScreen(this.value)">
@@ -1493,7 +1483,6 @@
 
             <!-- PRODUCTS SCREEN -->
             <div id="products-screen" class="hidden">
-                <p class="content-screen-title">Products</p>
                 <div class="search-container" style="margin-bottom: 16px;">
                     <span class="material-icons-round search-icon">search</span>
                     <input type="text" id="product-search-input" placeholder="Search products..." style="box-sizing:border-box;" oninput="renderProductsScreen(this.value)">
@@ -1510,7 +1499,6 @@
 
             <!-- SETTINGS SCREEN -->
             <div id="settings-screen" class="hidden">
-                <p class="content-screen-title">Settings</p>
                 <form id="settings-form" onsubmit="saveSettings(event)">
                     <div class="card-panel">
                         <p class="card-panel-title">Business Header Metadata</p>
@@ -2164,15 +2152,21 @@
             }
 
             if (existing) {
-                if (existing.name !== name) existing.name = name;
-                if (phone && existing.phone !== phone) existing.phone = phone;
-            } else {
-                customers.push({
-                    id: 'cust-' + Math.random().toString(36).substring(2, 9),
-                    name: name,
-                    phone: phone
-                });
+                // Do NOT rename an existing customer record just because one
+                // bill's name field was edited — that phone/name may be
+                // shared by other bills already, and silently renaming the
+                // master record would misattribute all of them. Only fill
+                // in a phone number if the record didn't have one yet.
+                if (!existing.phone && phone) existing.phone = phone;
+                saveCustomers();
+                return;
             }
+
+            customers.push({
+                id: 'cust-' + Math.random().toString(36).substring(2, 9),
+                name: name,
+                phone: phone
+            });
             saveCustomers();
         }
 
@@ -2314,6 +2308,17 @@
 
             bottomNav.style.display = isTabScreen ? 'grid' : 'none';
 
+            const headerTitle = document.getElementById('header-title');
+            const TAB_TITLES = {
+                'list-screen': 'BillBook',
+                'customers-screen': 'Customers',
+                'products-screen': 'Products',
+                'settings-screen': 'Settings'
+            };
+            if (headerTitle && TAB_TITLES[screenId]) {
+                headerTitle.innerText = TAB_TITLES[screenId];
+            }
+
             if (screenId === 'list-screen') {
                 fab.style.display = 'flex';
                 fabIcon.innerText = 'add';
@@ -2333,6 +2338,9 @@
             switchScreen('list-screen', 'nav-home');
             resetInvoiceForm();
             renderBillsList();
+            if (!isPopping) {
+                history.pushState({ screen: 'list' }, '', '');
+            }
         }
 
         function navigateToForm(billId = null) {
