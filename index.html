@@ -2185,7 +2185,7 @@
         // Called whenever a bill is saved or edited. Matches by phone when
         // available, otherwise falls back to matching by name, and never
         // creates duplicates.
-        function upsertCustomer(name, phone) {
+        async function upsertCustomer(name, phone) {
             name = (name || '').trim();
             phone = (phone || '').trim();
             if (!name) return;
@@ -2198,12 +2198,21 @@
             }
 
             if (existing) {
-                // Do NOT rename an existing customer record just because one
-                // bill's name field was edited — that phone/name may be
-                // shared by other bills already, and silently renaming the
-                // master record would misattribute all of them. Only fill
-                // in a phone number if the record didn't have one yet.
                 if (!existing.phone && phone) existing.phone = phone;
+
+                // Renaming an existing customer affects every other bill
+                // that shares this phone number, so confirm before applying
+                // it rather than silently overwriting the master record.
+                if (existing.name !== name) {
+                    const confirmed = await showAppConfirm(`Update customer name from "${existing.name}" to "${name}" everywhere?`, {
+                        icon: 'edit',
+                        confirmLabel: 'Update'
+                    });
+                    if (confirmed) {
+                        existing.name = name;
+                    }
+                }
+
                 saveCustomers();
                 return;
             }
@@ -2759,7 +2768,7 @@
             }
 
             localStorage.setItem('bills', JSON.stringify(bills));
-            upsertCustomer(customerName, customerPhone);
+            await upsertCustomer(customerName, customerPhone);
             history.back();
         }
 
