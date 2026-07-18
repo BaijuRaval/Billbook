@@ -395,7 +395,7 @@
         .content-area {
             flex: 1;
             overflow-y: auto;
-            padding: 20px 16px 100px 16px; /* 100px bottom cushion prevents floating FAB blocking */
+            padding: 20px 16px 180px 16px; /* clears the fixed bottom nav + floating FAB */
         }
 
         .content-area::-webkit-scrollbar {
@@ -475,6 +475,155 @@
         .form-control-readonly {
             background-color: #F5F5F0;
             color: #7A7980;
+        }
+
+        /* --- Searchable Suggestion Dropdown (Customer / Product selection) --- */
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--primary-container);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(6, 57, 112, 0.14);
+            z-index: 60;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .suggestion-item {
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--on-surface);
+            cursor: pointer;
+            border-bottom: 1px solid #F5F5EE;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:active {
+            background-color: var(--primary-container);
+        }
+
+        .suggestion-item-meta {
+            font-size: 11px;
+            color: var(--on-surface-variant);
+            font-weight: 500;
+        }
+
+        .suggestion-item-empty {
+            padding: 12px 14px;
+            font-size: 12px;
+            color: var(--on-surface-variant);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        /* --- Payment Method Selector --- */
+        .payment-method-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .payment-method-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 12px 8px;
+            border-radius: 14px;
+            border: 1px solid var(--border-light);
+            background-color: #F5F5EF;
+            color: var(--on-surface-variant);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .payment-method-btn .material-icons-round {
+            font-size: 20px;
+        }
+
+        .payment-method-btn.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+            color: #FFFFFF;
+        }
+
+        /* --- Customer / Product Cards --- */
+        .master-card {
+            background-color: var(--card-bg);
+            border-radius: 18px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 10px rgba(6, 57, 112, 0.06);
+            cursor: pointer;
+        }
+
+        .master-card:active {
+            transform: scale(0.98);
+        }
+
+        .master-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .master-card-name {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--on-surface);
+            margin: 0;
+        }
+
+        .master-card-meta {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--on-surface-variant);
+            margin-top: 2px;
+        }
+
+        .master-card-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #F5F5EE;
+        }
+
+        .master-card-stat-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--on-surface-variant);
+        }
+
+        .master-card-stat-value {
+            font-size: 15px;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .master-card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #F5F5EE;
         }
 
         /* --- Unified Screen Header --- */
@@ -758,7 +907,7 @@
             border-radius: 24px 24px 0 0;
             box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.04);
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             align-items: center;
             padding-bottom: var(--safe-area-bottom);
             z-index: 50;
@@ -807,7 +956,7 @@
         /* --- Premium Floating Action Button (FAB) --- */
         #fab-add {
             position: absolute;
-            bottom: calc(24px + var(--safe-area-bottom)); /* Placed safely over footer layout flow */
+            bottom: calc(76px + var(--safe-area-bottom) + 20px); /* Sits above the fixed bottom nav bar */
             right: 24px;
             width: 64px;
             height: 64px;
@@ -877,6 +1026,15 @@
             line-height: 1.6;
             max-width: 250px;
             font-weight: 500;
+        }
+
+        /* --- Content Screen Section Title (Customers / Products / Settings) --- */
+        .content-screen-title {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--on-surface);
+            letter-spacing: -0.3px;
+            margin: 0 0 16px 0;
         }
 
         /* --- Android Home Indicator Simulation --- */
@@ -1266,50 +1424,46 @@
                         <h1 class="brand-title">BillBook</h1>
                     </div>
                 </div>
-
-                <button onclick="navigateToSettings()" class="btn-close" style="background: rgba(255, 255, 255, 0.15); color: #FFFFFF; border-radius: 12px;">
-                    <span class="material-icons-round">settings</span>
-                </button>
             </div>
         </header>
 
         <!-- Dynamic Main Scroll Area -->
         <main class="content-area">
 
-            <div id="stats-row" class="stats-row">
-                <div class="stat-pill">
-                    <span class="material-icons-round">receipt_long</span>
-                    <span id="bill-counter">0 Bills</span>
-                </div>
-                <div class="stat-pill stat-pill-total">
-                    <span class="material-icons-round">payments</span>
-                    <span id="total-amount-counter">₹0.00</span>
-                </div>
-            </div>
-
-            <div id="search-bar-container" class="search-container" style="margin-bottom: 16px;">
-                <span class="material-icons-round search-icon">search</span>
-                <input type="text" id="search-input" placeholder="Search customer or invoice..." style="box-sizing:border-box;">
-            </div>
-
-            <div id="date-filter-row" class="date-filter-row">
-                <div class="date-filter-field">
-                    <label class="date-filter-label">From</label>
-                    <input type="date" id="filter-date-from" class="form-control">
-                </div>
-                <div class="date-filter-field">
-                    <label class="date-filter-label">To</label>
-                    <input type="date" id="filter-date-to" class="form-control">
-                </div>
-                <button type="button" id="clear-date-filter-btn" onclick="clearDateFilter()" class="date-filter-clear hidden" title="Clear date filter">
-                    <span class="material-icons-round">close</span>
-                </button>
-            </div>
-
-            <!-- LIST SCREEN -->
+            <!-- LIST SCREEN (Home) -->
             <div id="list-screen" class="fade-in">
+                <div id="stats-row" class="stats-row">
+                    <div class="stat-pill">
+                        <span class="material-icons-round">receipt_long</span>
+                        <span id="bill-counter">0 Bills</span>
+                    </div>
+                    <div class="stat-pill stat-pill-total">
+                        <span class="material-icons-round">payments</span>
+                        <span id="total-amount-counter">₹0.00</span>
+                    </div>
+                </div>
+
+                <div id="search-bar-container" class="search-container" style="margin-bottom: 16px;">
+                    <span class="material-icons-round search-icon">search</span>
+                    <input type="text" id="search-input" placeholder="Search customer or invoice..." style="box-sizing:border-box;">
+                </div>
+
+                <div id="date-filter-row" class="date-filter-row">
+                    <div class="date-filter-field">
+                        <label class="date-filter-label">From</label>
+                        <input type="date" id="filter-date-from" class="form-control">
+                    </div>
+                    <div class="date-filter-field">
+                        <label class="date-filter-label">To</label>
+                        <input type="date" id="filter-date-to" class="form-control">
+                    </div>
+                    <button type="button" id="clear-date-filter-btn" onclick="clearDateFilter()" class="date-filter-clear hidden" title="Clear date filter">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+
                 <div id="bills-list"></div>
-                
+
                 <!-- Zero State empty message -->
                 <div id="empty-state" class="empty-state hidden">
                     <div class="empty-state-icon">
@@ -1320,7 +1474,104 @@
                 </div>
             </div>
 
+            <!-- CUSTOMERS SCREEN -->
+            <div id="customers-screen" class="hidden">
+                <p class="content-screen-title">Customers</p>
+                <div class="search-container" style="margin-bottom: 16px;">
+                    <span class="material-icons-round search-icon">search</span>
+                    <input type="text" id="customer-search-input" placeholder="Search customers..." style="box-sizing:border-box;" oninput="renderCustomersScreen(this.value)">
+                </div>
+                <div id="customers-list"></div>
+                <div id="customers-empty-state" class="empty-state hidden">
+                    <div class="empty-state-icon">
+                        <span class="material-icons-round">groups</span>
+                    </div>
+                    <p class="empty-state-title">No customers yet</p>
+                    <p class="empty-state-desc">Customers are added automatically when you save an invoice.</p>
+                </div>
+            </div>
+
+            <!-- PRODUCTS SCREEN -->
+            <div id="products-screen" class="hidden">
+                <p class="content-screen-title">Products</p>
+                <div class="search-container" style="margin-bottom: 16px;">
+                    <span class="material-icons-round search-icon">search</span>
+                    <input type="text" id="product-search-input" placeholder="Search products..." style="box-sizing:border-box;" oninput="renderProductsScreen(this.value)">
+                </div>
+                <div id="products-list"></div>
+                <div id="products-empty-state" class="empty-state hidden">
+                    <div class="empty-state-icon">
+                        <span class="material-icons-round">inventory_2</span>
+                    </div>
+                    <p class="empty-state-title">No products yet</p>
+                    <p class="empty-state-desc">Tap the floating action button below to add your first product.</p>
+                </div>
+            </div>
+
+            <!-- SETTINGS SCREEN -->
+            <div id="settings-screen" class="hidden">
+                <p class="content-screen-title">Settings</p>
+                <form id="settings-form" onsubmit="saveSettings(event)">
+                    <div class="card-panel">
+                        <p class="card-panel-title">Business Header Metadata</p>
+
+                        <div class="form-group">
+                            <label class="form-label">Shop / Business Name *</label>
+                            <input type="text" id="shop-name" required class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Location / Address *</label>
+                            <input type="text" id="shop-address" required class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Contact Number *</label>
+                            <input type="text" id="shop-phone" required class="form-control">
+                        </div>
+
+                        <button type="submit" class="btn-submit" style="margin-top: 4px;">
+                            <span class="material-icons-round">save</span> Save Configuration
+                        </button>
+                    </div>
+
+                    <div class="card-panel">
+                        <p class="card-panel-title">Backup & Restore</p>
+                        <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Save your invoices and settings to a file, or restore from a previous backup.</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <button type="button" id="backup-btn" onclick="backupToFile()" class="btn-action btn-pdf btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">download</span> Backup
+                            </button>
+                            <button type="button" id="restore-btn" onclick="triggerRestoreFile()" class="btn-action btn-edit btn-action-lg">
+                                <span class="material-icons-round" style="font-size: 16px;">upload</span> Restore
+                            </button>
+                        </div>
+                        <input type="file" id="restore-file-input" accept="application/json,.json" class="hidden" onchange="handleRestoreFile(event)">
+                    </div>
+                </form>
+            </div>
+
         </main>
+
+        <!-- Fixed Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button id="nav-home" class="nav-item" onclick="navigateToList()">
+                <div class="nav-icon-container"><span class="material-icons-round">home</span></div>
+                <span class="nav-label">Home</span>
+            </button>
+            <button id="nav-customers" class="nav-item" onclick="navigateToCustomers()">
+                <div class="nav-icon-container"><span class="material-icons-round">groups</span></div>
+                <span class="nav-label">Customer</span>
+            </button>
+            <button id="nav-products" class="nav-item" onclick="navigateToProducts()">
+                <div class="nav-icon-container"><span class="material-icons-round">inventory_2</span></div>
+                <span class="nav-label">Product</span>
+            </button>
+            <button id="nav-settings" class="nav-item" onclick="navigateToSettings()">
+                <div class="nav-icon-container"><span class="material-icons-round">settings</span></div>
+                <span class="nav-label">Setting</span>
+            </button>
+        </nav>
 
         <!-- INVOICE CREATOR FORM SCREEN (Full Screen Overlay) -->
         <div id="form-screen" class="full-screen-overlay hidden">
@@ -1337,9 +1588,10 @@
                     <!-- Client Details Panel -->
                     <div class="card-panel">
                         <p class="card-panel-title">Client Information</p>
-                        <div class="form-group">
+                        <div class="form-group" style="position: relative;">
                             <label class="form-label">Customer Name *</label>
-                            <input type="text" id="cust-name" required class="form-control">
+                            <input type="text" id="cust-name" required class="form-control" autocomplete="off" placeholder="Search or add customer" oninput="handleCustomerSearch()" onfocus="handleCustomerSearch()" onblur="hideCustomerSuggestionsDelayed()">
+                            <div id="cust-suggestions" class="suggestions-dropdown hidden"></div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Phone Number</label>
@@ -1394,59 +1646,48 @@
                         </div>
                     </div>
 
+                    <!-- Payment Method Panel -->
+                    <div class="card-panel">
+                        <p class="card-panel-title">Payment Method</p>
+                        <div class="payment-method-selector">
+                            <button type="button" class="payment-method-btn active" data-method="Cash" onclick="setPaymentMethod('Cash')">
+                                <span class="material-icons-round">payments</span> Cash
+                            </button>
+                            <button type="button" class="payment-method-btn" data-method="Cheque" onclick="setPaymentMethod('Cheque')">
+                                <span class="material-icons-round">receipt_long</span> Cheque
+                            </button>
+                            <button type="button" class="payment-method-btn" data-method="UPI" onclick="setPaymentMethod('UPI')">
+                                <span class="material-icons-round">qr_code</span> UPI
+                            </button>
+                        </div>
+                        <input type="hidden" id="payment-method" value="Cash">
+
+                        <div id="payment-fields-cheque" class="hidden" style="margin-top: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">Cheque Number</label>
+                                <input type="text" id="cheque-number" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Bank Name</label>
+                                <input type="text" id="cheque-bank" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Cheque Date</label>
+                                <input type="date" id="cheque-date" class="form-control">
+                            </div>
+                        </div>
+
+                        <div id="payment-fields-upi" class="hidden" style="margin-top: 16px;">
+                            <div class="form-group">
+                                <label class="form-label">UPI Transaction ID</label>
+                                <input type="text" id="upi-txn-id" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn-submit">
                         <span class="material-icons-round">save</span> Save Invoice
                     </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- SETTINGS SCREEN (Full Screen Overlay) -->
-        <div id="settings-screen" class="full-screen-overlay hidden">
-            <div class="overlay-header">
-                <button type="button" onclick="history.back()" class="overlay-back-btn">
-                    <span class="material-icons-round">arrow_back</span>
-                </button>
-                <h2 class="overlay-title">Settings</h2>
-            </div>
-            <div class="overlay-body">
-                <form id="settings-form" onsubmit="saveSettings(event)">
-                    <div class="card-panel">
-                        <p class="card-panel-title">Business Header Metadata</p>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Shop / Business Name *</label>
-                            <input type="text" id="shop-name" required class="form-control">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Location / Address *</label>
-                            <input type="text" id="shop-address" required class="form-control">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Contact Number *</label>
-                            <input type="text" id="shop-phone" required class="form-control">
-                        </div>
-
-                        <button type="submit" class="btn-submit" style="margin-top: 4px;">
-                            <span class="material-icons-round">save</span> Save Configuration
-                        </button>
-                    </div>
-
-                    <div class="card-panel">
-                        <p class="card-panel-title">Backup & Restore</p>
-                        <p style="font-size: 12px; color: var(--on-surface-variant); font-weight: 500; margin: 0 0 16px 0;">Save your invoices and settings to a file, or restore from a previous backup.</p>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <button type="button" id="backup-btn" onclick="backupToFile()" class="btn-action btn-pdf btn-action-lg">
-                                <span class="material-icons-round" style="font-size: 16px;">download</span> Backup
-                            </button>
-                            <button type="button" id="restore-btn" onclick="triggerRestoreFile()" class="btn-action btn-edit btn-action-lg">
-                                <span class="material-icons-round" style="font-size: 16px;">upload</span> Restore
-                            </button>
-                        </div>
-                        <input type="file" id="restore-file-input" accept="application/json,.json" class="hidden" onchange="handleRestoreFile(event)">
-                    </div>
                 </form>
             </div>
         </div>
@@ -1461,6 +1702,19 @@
             </div>
             <div class="overlay-body" id="view-content">
                 <!-- Injected by renderViewScreen() -->
+            </div>
+        </div>
+
+        <!-- CUSTOMER DETAIL SCREEN (Full Screen Overlay, Read-Only) -->
+        <div id="customer-detail-screen" class="full-screen-overlay hidden">
+            <div class="overlay-header">
+                <button type="button" onclick="history.back()" class="overlay-back-btn">
+                    <span class="material-icons-round">arrow_back</span>
+                </button>
+                <h2 class="overlay-title">Customer Details</h2>
+            </div>
+            <div class="overlay-body" id="customer-detail-content">
+                <!-- Injected by renderCustomerDetail() -->
             </div>
         </div>
 
@@ -1511,8 +1765,8 @@
         </div>
 
         <!-- Floating Action Button (FAB) -->
-        <button id="fab-add" onclick="navigateToForm()">
-            <span class="material-icons-round">add</span>
+        <button id="fab-add">
+            <span id="fab-add-icon" class="material-icons-round">add</span>
         </button>
 
         
@@ -1540,9 +1794,10 @@
         <div id="item-modal-overlay" class="app-modal-overlay hidden">
             <div class="app-modal-card" style="text-align: left;">
                 <p id="item-modal-title" class="card-panel-title" style="text-align: center;">Add Item</p>
-                <div class="form-group">
+                <div class="form-group" style="position: relative;">
                     <label class="form-label">Item Name</label>
-                    <input type="text" id="item-modal-name" class="form-control" placeholder="e.g. Consulting Service">
+                    <input type="text" id="item-modal-name" class="form-control" placeholder="Search or add product" autocomplete="off" oninput="handleProductSearch()" onfocus="handleProductSearch()" onblur="hideProductSuggestionsDelayed()">
+                    <div id="product-suggestions" class="suggestions-dropdown hidden"></div>
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <div class="form-group" style="flex: 1;">
@@ -1557,6 +1812,25 @@
                 <div class="app-modal-actions" style="margin-top: 4px;">
                     <button type="button" onclick="closeItemModal()" class="app-modal-btn app-modal-btn-cancel">Cancel</button>
                     <button type="button" onclick="saveItemModal()" class="app-modal-btn app-modal-btn-confirm">Save Item</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD / EDIT PRODUCT MODAL -->
+        <div id="product-modal-overlay" class="app-modal-overlay hidden">
+            <div class="app-modal-card" style="text-align: left;">
+                <p id="product-modal-title" class="card-panel-title" style="text-align: center;">Add Product</p>
+                <div class="form-group">
+                    <label class="form-label">Product Name</label>
+                    <input type="text" id="product-modal-name" class="form-control" placeholder="e.g. Consulting Service">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Default Price</label>
+                    <input type="number" id="product-modal-price" min="0" step="0.01" value="0" class="form-control">
+                </div>
+                <div class="app-modal-actions" style="margin-top: 4px;">
+                    <button type="button" onclick="closeProductModal()" class="app-modal-btn app-modal-btn-cancel">Cancel</button>
+                    <button type="button" onclick="saveProductModal()" class="app-modal-btn app-modal-btn-confirm">Save Product</button>
                 </div>
             </div>
         </div>
@@ -1608,6 +1882,8 @@
         }
 
         let bills = JSON.parse(localStorage.getItem('bills')) || [];
+        let customers = JSON.parse(localStorage.getItem('customers')) || [];
+        let products = JSON.parse(localStorage.getItem('products')) || [];
         let shopSettings = JSON.parse(localStorage.getItem('billbook_settings')) || {
             name: 'BillBook Retailers',
             address: '123 Market Road, New Delhi',
@@ -1674,6 +1950,7 @@
         function openApp() {
             document.getElementById('app-loader').classList.add('hidden');
             document.getElementById('activation-screen').classList.add('hidden');
+            switchScreen('list-screen', 'nav-home');
         }
 
         async function bootLicenseCheck() {
@@ -1833,8 +2110,121 @@
             }
         }
 
-        function generateBillNumber() {
-            return 'BB-' + Math.floor(100000 + Math.random() * 900000);
+        function getBillCounterState() {
+            const now = new Date();
+            const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+            const storedDateKey = localStorage.getItem('billbook_invoice_date_key');
+            const storedCounter = parseInt(localStorage.getItem('billbook_invoice_counter'), 10) || 0;
+            const counter = (storedDateKey === dateKey) ? storedCounter : 0;
+            return { now, dateKey, counter };
+        }
+
+        function formatBillNumber(now, counter) {
+            const day = now.getDate();
+            const month = now.getMonth() + 1;
+            const year = now.getFullYear();
+            return `${day}${month}${year}${counter}`;
+        }
+
+        // Preview only — does NOT persist. Used while the Add Invoice form
+        // is open so the displayed number never changes until actually saved.
+        function peekNextBillNumber() {
+            const { now, counter } = getBillCounterState();
+            return formatBillNumber(now, counter + 1);
+        }
+
+        // Persists the increment. Only called once, at the moment a NEW
+        // invoice is actually saved, so numbers never skip or change later.
+        function commitBillNumber() {
+            const { now, dateKey, counter } = getBillCounterState();
+            const nextCounter = counter + 1;
+            localStorage.setItem('billbook_invoice_date_key', dateKey);
+            localStorage.setItem('billbook_invoice_counter', String(nextCounter));
+            return formatBillNumber(now, nextCounter);
+        }
+
+        // ================= CUSTOMER MASTER =================
+        function saveCustomers() {
+            localStorage.setItem('customers', JSON.stringify(customers));
+        }
+
+        // Called whenever a bill is saved or edited. Matches by phone when
+        // available, otherwise falls back to matching by name, and never
+        // creates duplicates.
+        function upsertCustomer(name, phone) {
+            name = (name || '').trim();
+            phone = (phone || '').trim();
+            if (!name) return;
+
+            let existing = null;
+            if (phone) {
+                existing = customers.find(c => (c.phone || '').trim() === phone);
+            } else {
+                existing = customers.find(c => (c.name || '').trim().toLowerCase() === name.toLowerCase());
+            }
+
+            if (existing) {
+                if (existing.name !== name) existing.name = name;
+                if (phone && existing.phone !== phone) existing.phone = phone;
+            } else {
+                customers.push({
+                    id: 'cust-' + Math.random().toString(36).substring(2, 9),
+                    name: name,
+                    phone: phone
+                });
+            }
+            saveCustomers();
+        }
+
+        function searchCustomers(query) {
+            query = (query || '').toLowerCase().trim();
+            if (!query) return customers.slice(0, 8);
+            return customers.filter(c =>
+                (c.name || '').toLowerCase().includes(query) ||
+                (c.phone || '').toLowerCase().includes(query)
+            ).slice(0, 8);
+        }
+
+        function getCustomerStats(customer) {
+            const custBills = bills.filter(b => {
+                if (customer.phone) return (b.customerPhone || '').trim() === customer.phone;
+                return (b.customerName || '').trim().toLowerCase() === customer.name.toLowerCase();
+            });
+            const total = custBills.reduce((sum, b) => sum + b.grandTotal, 0);
+            return { bills: custBills, count: custBills.length, total };
+        }
+
+        // ================= PRODUCT MASTER =================
+        function saveProducts() {
+            localStorage.setItem('products', JSON.stringify(products));
+        }
+
+        function findProductByName(name) {
+            name = (name || '').trim().toLowerCase();
+            if (!name) return null;
+            return products.find(p => (p.name || '').trim().toLowerCase() === name) || null;
+        }
+
+        // Auto-saves brand-new products silently. Price updates to an
+        // EXISTING product are handled separately (see saveItemModal) since
+        // those require user confirmation.
+        function upsertNewProduct(name, price) {
+            name = (name || '').trim();
+            if (!name) return;
+            const existing = findProductByName(name);
+            if (existing) return;
+            products.push({
+                id: 'prod-' + Math.random().toString(36).substring(2, 9),
+                name: name,
+                price: price || 0
+            });
+            saveProducts();
+        }
+
+        function searchProducts(query) {
+            query = (query || '').toLowerCase().trim();
+            if (!query) return products.slice(0, 8);
+            return products.filter(p => (p.name || '').toLowerCase().includes(query)).slice(0, 8);
         }
 
         function setupSearchEngine() {
@@ -1881,6 +2271,12 @@
                 navigateToSettings();
             } else if (state.screen === 'view') {
                 navigateToView(state.billId);
+            } else if (state.screen === 'customers') {
+                navigateToCustomers();
+            } else if (state.screen === 'products') {
+                navigateToProducts();
+            } else if (state.screen === 'customer-detail') {
+                navigateToCustomerDetail(state.customerId);
             } else {
                 navigateToList();
             }
@@ -1889,7 +2285,7 @@
 
         // --- Screen Transitions (Perfect Tab Controls) ---
         function switchScreen(screenId, navId) {
-            const screens = ['list-screen', 'form-screen', 'settings-screen', 'view-screen'];
+            const screens = ['list-screen', 'form-screen', 'settings-screen', 'view-screen', 'customers-screen', 'products-screen', 'customer-detail-screen'];
             screens.forEach(s => {
                 const element = document.getElementById(s);
                 if (s === screenId) {
@@ -1902,23 +2298,33 @@
             });
 
             // Adjust nav container selections
-            ['nav-home','nav-add','nav-settings'].forEach(btn=>{
- const buttonEl=document.getElementById(btn);
- if(buttonEl){
-   if(btn===navId) buttonEl.classList.add('active');
-   else buttonEl.classList.remove('active');
- }
-});
+            ['nav-home', 'nav-customers', 'nav-products', 'nav-settings'].forEach(btn => {
+                const buttonEl = document.getElementById(btn);
+                if (buttonEl) {
+                    if (btn === navId) buttonEl.classList.add('active');
+                    else buttonEl.classList.remove('active');
+                }
+            });
 
             // Handle components visibility depending on screen
             const fab = document.getElementById('fab-add');
-            const search = document.getElementById('search-bar-container');
+            const fabIcon = document.getElementById('fab-add-icon');
+            const bottomNav = document.querySelector('.bottom-nav');
+            const isTabScreen = ['list-screen', 'customers-screen', 'products-screen', 'settings-screen'].includes(screenId);
+
+            bottomNav.style.display = isTabScreen ? 'grid' : 'none';
+
             if (screenId === 'list-screen') {
                 fab.style.display = 'flex';
-                search.style.display = 'block';
+                fabIcon.innerText = 'add';
+                fab.onclick = () => navigateToForm();
+            } else if (screenId === 'products-screen') {
+                fab.style.display = 'flex';
+                fabIcon.innerText = 'add';
+                fab.onclick = () => openProductModal();
             } else {
                 fab.style.display = 'none';
-                search.style.display = 'none';
+                fab.onclick = null;
             }
         }
 
@@ -1930,7 +2336,7 @@
         }
 
         function navigateToForm(billId = null) {
-            switchScreen('form-screen', 'nav-add');
+            switchScreen('form-screen', null);
 
             if (billId) {
                 const bill = bills.find(b => b.id === billId);
@@ -1952,6 +2358,12 @@
                         price: item.price
                     }));
                     renderItemRows();
+
+                    setPaymentMethod(bill.paymentMethod || 'Cash');
+                    document.getElementById('cheque-number').value = bill.chequeNumber || '';
+                    document.getElementById('cheque-bank').value = bill.chequeBank || '';
+                    document.getElementById('cheque-date').value = bill.chequeDate || '';
+                    document.getElementById('upi-txn-id').value = bill.upiTxnId || '';
                 }
             } else {
                 currentEditingId = null;
@@ -1982,14 +2394,91 @@
             }
         }
 
+        function navigateToCustomers() {
+            switchScreen('customers-screen', 'nav-customers');
+            renderCustomersScreen();
+            if (!isPopping) {
+                history.pushState({ screen: 'customers' }, '', '');
+            }
+        }
+
+        function navigateToProducts() {
+            switchScreen('products-screen', 'nav-products');
+            renderProductsScreen();
+            if (!isPopping) {
+                history.pushState({ screen: 'products' }, '', '');
+            }
+        }
+
+        function navigateToCustomerDetail(customerId) {
+            const customer = customers.find(c => c.id === customerId);
+            if (!customer) return;
+            switchScreen('customer-detail-screen', null);
+            renderCustomerDetail(customer);
+            if (!isPopping) {
+                history.pushState({ screen: 'customer-detail', customerId }, '', '');
+            }
+        }
+
         function resetInvoiceForm() {
             document.getElementById('bill-form').reset();
             document.getElementById('edit-bill-id').value = '';
-            document.getElementById('bill-number').value = generateBillNumber();
+            document.getElementById('bill-number').value = peekNextBillNumber();
             document.getElementById('bill-date').valueAsDate = new Date();
             currentFormItems = [];
             renderItemRows();
             calculateGrandTotal();
+            setPaymentMethod('Cash');
+        }
+
+        // --- Payment Method Selector ---
+        function setPaymentMethod(method) {
+            document.getElementById('payment-method').value = method;
+
+            document.querySelectorAll('.payment-method-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.method === method);
+            });
+
+            document.getElementById('payment-fields-cheque').classList.toggle('hidden', method !== 'Cheque');
+            document.getElementById('payment-fields-upi').classList.toggle('hidden', method !== 'UPI');
+        }
+
+        // --- Customer Search Dropdown (Add/Edit Invoice) ---
+        function handleCustomerSearch() {
+            const query = document.getElementById('cust-name').value;
+            const matches = searchCustomers(query);
+            renderCustomerSuggestions(matches, query);
+        }
+
+        function renderCustomerSuggestions(matches, query) {
+            const box = document.getElementById('cust-suggestions');
+            if (matches.length === 0) {
+                box.innerHTML = query.trim()
+                    ? `<div class="suggestion-item-empty">No match — "${query.trim()}" will be added as a new customer</div>`
+                    : `<div class="suggestion-item-empty">Start typing to search customers</div>`;
+            } else {
+                box.innerHTML = matches.map(c => `
+                    <div class="suggestion-item" onmousedown="selectCustomer('${c.id}')">
+                        <span>${c.name}</span>
+                        ${c.phone ? `<span class="suggestion-item-meta">${c.phone}</span>` : ''}
+                    </div>
+                `).join('');
+            }
+            box.classList.remove('hidden');
+        }
+
+        function selectCustomer(id) {
+            const customer = customers.find(c => c.id === id);
+            if (!customer) return;
+            document.getElementById('cust-name').value = customer.name;
+            document.getElementById('cust-phone').value = customer.phone || '';
+            document.getElementById('cust-suggestions').classList.add('hidden');
+        }
+
+        function hideCustomerSuggestionsDelayed() {
+            setTimeout(() => {
+                document.getElementById('cust-suggestions').classList.add('hidden');
+            }, 150);
         }
 
         // --- Add / Edit Item Modal ---
@@ -2016,6 +2505,7 @@
                 priceInput.value = '';
             }
 
+            document.getElementById('product-suggestions').classList.add('hidden');
             document.getElementById('item-modal-overlay').classList.remove('hidden');
             nameInput.focus();
         }
@@ -2023,6 +2513,44 @@
         function closeItemModal() {
             document.getElementById('item-modal-overlay').classList.add('hidden');
             editingItemRowId = null;
+        }
+
+        // --- Product Search Dropdown (Add/Edit Item modal) ---
+        function handleProductSearch() {
+            const query = document.getElementById('item-modal-name').value;
+            const matches = searchProducts(query);
+            renderProductSuggestions(matches, query);
+        }
+
+        function renderProductSuggestions(matches, query) {
+            const box = document.getElementById('product-suggestions');
+            if (matches.length === 0) {
+                box.innerHTML = query.trim()
+                    ? `<div class="suggestion-item-empty">No match — "${query.trim()}" will be added as a new product</div>`
+                    : `<div class="suggestion-item-empty">Start typing to search products</div>`;
+            } else {
+                box.innerHTML = matches.map(p => `
+                    <div class="suggestion-item" onmousedown="selectProduct('${p.id}')">
+                        <span>${p.name}</span>
+                        <span class="suggestion-item-meta">₹${(p.price || 0).toFixed(2)}</span>
+                    </div>
+                `).join('');
+            }
+            box.classList.remove('hidden');
+        }
+
+        function selectProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            document.getElementById('item-modal-name').value = product.name;
+            document.getElementById('item-modal-price').value = product.price || 0;
+            document.getElementById('product-suggestions').classList.add('hidden');
+        }
+
+        function hideProductSuggestionsDelayed() {
+            setTimeout(() => {
+                document.getElementById('product-suggestions').classList.add('hidden');
+            }, 150);
         }
 
         async function saveItemModal() {
@@ -2033,6 +2561,23 @@
             if (!name) {
                 await showAppAlert("Please enter an item name.", { icon: 'error_outline', danger: true });
                 return;
+            }
+
+            // Product Master sync: brand-new products are saved silently;
+            // a price change on an EXISTING product asks for confirmation
+            // before updating its stored default price.
+            const existingProduct = findProductByName(name);
+            if (!existingProduct) {
+                upsertNewProduct(name, price);
+            } else if (Math.abs((existingProduct.price || 0) - price) > 0.001) {
+                const confirmed = await showAppConfirm("Update default product price?", {
+                    icon: 'sell',
+                    confirmLabel: 'Update'
+                });
+                if (confirmed) {
+                    existingProduct.price = price;
+                    saveProducts();
+                }
             }
 
             if (editingItemRowId) {
@@ -2128,17 +2673,29 @@
 
             const math = calculateGrandTotal();
             const billId = document.getElementById('edit-bill-id').value || 'ID-' + Date.now();
+            const billNo = currentEditingId
+                ? document.getElementById('bill-number').value
+                : commitBillNumber();
+            const customerName = document.getElementById('cust-name').value.trim();
+            const customerPhone = document.getElementById('cust-phone').value.trim();
+            const paymentMethod = document.getElementById('payment-method').value;
+
             const payload = {
                 id: billId,
-                billNo: document.getElementById('bill-number').value,
-                customerName: document.getElementById('cust-name').value.trim(),
-                customerPhone: document.getElementById('cust-phone').value.trim(),
+                billNo: billNo,
+                customerName: customerName,
+                customerPhone: customerPhone,
                 date: document.getElementById('bill-date').value,
                 items,
                 discount: parseFloat(document.getElementById('bill-discount').value) || 0,
                 tax: parseFloat(document.getElementById('bill-tax').value) || 0,
                 subtotal: math.subtotal,
-                grandTotal: math.total
+                grandTotal: math.total,
+                paymentMethod: paymentMethod,
+                chequeNumber: paymentMethod === 'Cheque' ? document.getElementById('cheque-number').value.trim() : '',
+                chequeBank: paymentMethod === 'Cheque' ? document.getElementById('cheque-bank').value.trim() : '',
+                chequeDate: paymentMethod === 'Cheque' ? document.getElementById('cheque-date').value : '',
+                upiTxnId: paymentMethod === 'UPI' ? document.getElementById('upi-txn-id').value.trim() : ''
             };
 
             if (currentEditingId) {
@@ -2148,6 +2705,7 @@
             }
 
             localStorage.setItem('bills', JSON.stringify(bills));
+            upsertCustomer(customerName, customerPhone);
             history.back();
         }
 
@@ -2231,6 +2789,36 @@
                 `;
             });
 
+            let paymentRows = `
+                <div class="view-row">
+                    <span class="view-row-label">Method</span>
+                    <span class="view-row-value">${bill.paymentMethod || 'Cash'}</span>
+                </div>
+            `;
+            if (bill.paymentMethod === 'Cheque') {
+                paymentRows += `
+                    <div class="view-row">
+                        <span class="view-row-label">Cheque Number</span>
+                        <span class="view-row-value">${bill.chequeNumber || 'N/A'}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Bank Name</span>
+                        <span class="view-row-value">${bill.chequeBank || 'N/A'}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Cheque Date</span>
+                        <span class="view-row-value">${bill.chequeDate ? formatDate(bill.chequeDate) : 'N/A'}</span>
+                    </div>
+                `;
+            } else if (bill.paymentMethod === 'UPI') {
+                paymentRows += `
+                    <div class="view-row">
+                        <span class="view-row-label">UPI Transaction ID</span>
+                        <span class="view-row-value">${bill.upiTxnId || 'N/A'}</span>
+                    </div>
+                `;
+            }
+
             document.getElementById('view-content').innerHTML = `
                 <div class="card-panel">
                     <p class="card-panel-title">Client Information</p>
@@ -2289,6 +2877,11 @@
                     </div>
                 </div>
 
+                <div class="card-panel">
+                    <p class="card-panel-title">Payment Information</p>
+                    ${paymentRows}
+                </div>
+
                 <div class="view-action-bar">
                     <button type="button" class="btn-action btn-pdf btn-action-lg" onclick="exportToPDF('${bill.id}')">
                         <span class="material-icons-round" style="font-size: 16px;">download</span> PDF
@@ -2316,6 +2909,201 @@
             }
         }
 
+        // ================= CUSTOMERS SCREEN =================
+        function renderCustomersScreen(query = '') {
+            const list = document.getElementById('customers-list');
+            const emptyState = document.getElementById('customers-empty-state');
+            query = query.toLowerCase().trim();
+
+            const filtered = customers.filter(c =>
+                (c.name || '').toLowerCase().includes(query) ||
+                (c.phone || '').toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                list.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            list.innerHTML = filtered.map(c => {
+                const stats = getCustomerStats(c);
+                return `
+                    <div class="master-card" onclick="navigateToCustomerDetail('${c.id}')">
+                        <div class="master-card-header">
+                            <div>
+                                <p class="master-card-name">${c.name}</p>
+                                ${c.phone ? `<p class="master-card-meta">${c.phone}</p>` : ''}
+                            </div>
+                            <span class="material-icons-round" style="color: var(--primary);">chevron_right</span>
+                        </div>
+                        <div class="master-card-stats">
+                            <div>
+                                <div class="master-card-stat-label">Total Bills</div>
+                                <div class="master-card-stat-value">${stats.count}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="master-card-stat-label">Total Amount</div>
+                                <div class="master-card-stat-value">₹${stats.total.toFixed(2)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderCustomerDetail(customer) {
+            const stats = getCustomerStats(customer);
+            const sortedBills = [...stats.bills].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+            const invoiceRows = sortedBills.length === 0
+                ? `<p class="item-row-empty">No invoices yet.</p>`
+                : sortedBills.map(bill => `
+                    <div class="item-row" style="cursor: pointer;" onclick="navigateToView('${bill.id}')">
+                        <div class="item-row-info">
+                            <p class="item-row-name">${bill.billNo}</p>
+                            <p class="item-row-meta">${formatDate(bill.date)}</p>
+                        </div>
+                        <p class="item-row-amount">₹${bill.grandTotal.toFixed(2)}</p>
+                        <span class="material-icons-round" style="color: var(--primary);">chevron_right</span>
+                    </div>
+                `).join('');
+
+            document.getElementById('customer-detail-content').innerHTML = `
+                <div class="card-panel">
+                    <p class="card-panel-title">Customer Details</p>
+                    <div class="view-row">
+                        <span class="view-row-label">Name</span>
+                        <span class="view-row-value">${customer.name}</span>
+                    </div>
+                    <div class="view-row">
+                        <span class="view-row-label">Phone</span>
+                        <span class="view-row-value">${customer.phone || 'N/A'}</span>
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-pill">
+                        <span class="material-icons-round">receipt_long</span>
+                        <span>${stats.count} Bill${stats.count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="stat-pill stat-pill-total">
+                        <span class="material-icons-round">payments</span>
+                        <span>₹${stats.total.toFixed(2)}</span>
+                    </div>
+                </div>
+
+                <div class="card-panel">
+                    <p class="card-panel-title">Invoices</p>
+                    ${invoiceRows}
+                </div>
+            `;
+        }
+
+        // ================= PRODUCTS SCREEN =================
+        function renderProductsScreen(query = '') {
+            const list = document.getElementById('products-list');
+            const emptyState = document.getElementById('products-empty-state');
+            query = query.toLowerCase().trim();
+
+            const filtered = products.filter(p => (p.name || '').toLowerCase().includes(query));
+
+            if (filtered.length === 0) {
+                list.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            list.innerHTML = filtered.map(p => `
+                <div class="master-card" style="cursor: default;">
+                    <div class="master-card-header">
+                        <div>
+                            <p class="master-card-name">${p.name}</p>
+                            <p class="master-card-meta">Default Price: ₹${(p.price || 0).toFixed(2)}</p>
+                        </div>
+                    </div>
+                    <div class="master-card-actions">
+                        <button type="button" class="btn-action btn-edit btn-action-lg" onclick="openProductModal('${p.id}')">
+                            <span class="material-icons-round" style="font-size: 16px;">edit</span> Edit
+                        </button>
+                        <button type="button" class="btn-action btn-delete btn-action-lg" onclick="deleteProduct('${p.id}')">
+                            <span class="material-icons-round" style="font-size: 16px;">delete_outline</span> Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        let editingProductId = null;
+
+        function openProductModal(productId = null) {
+            editingProductId = productId;
+            const nameInput = document.getElementById('product-modal-name');
+            const priceInput = document.getElementById('product-modal-price');
+            const title = document.getElementById('product-modal-title');
+
+            if (productId) {
+                const product = products.find(p => p.id === productId);
+                title.innerText = 'Edit Product';
+                nameInput.value = product ? product.name : '';
+                priceInput.value = product ? product.price : '';
+            } else {
+                title.innerText = 'Add Product';
+                nameInput.value = '';
+                priceInput.value = '';
+            }
+
+            document.getElementById('product-modal-overlay').classList.remove('hidden');
+            nameInput.focus();
+        }
+
+        function closeProductModal() {
+            document.getElementById('product-modal-overlay').classList.add('hidden');
+            editingProductId = null;
+        }
+
+        async function saveProductModal() {
+            const name = document.getElementById('product-modal-name').value.trim();
+            const price = parseFloat(document.getElementById('product-modal-price').value) || 0;
+
+            if (!name) {
+                await showAppAlert("Please enter a product name.", { icon: 'error_outline', danger: true });
+                return;
+            }
+
+            const duplicate = products.find(p =>
+                p.id !== editingProductId && (p.name || '').trim().toLowerCase() === name.toLowerCase()
+            );
+            if (duplicate) {
+                await showAppAlert("A product with this name already exists.", { icon: 'error_outline', danger: true });
+                return;
+            }
+
+            if (editingProductId) {
+                products = products.map(p => p.id === editingProductId ? { ...p, name, price } : p);
+            } else {
+                products.push({ id: 'prod-' + Math.random().toString(36).substring(2, 9), name, price });
+            }
+
+            saveProducts();
+            closeProductModal();
+            renderProductsScreen(document.getElementById('product-search-input').value);
+        }
+
+        async function deleteProduct(id) {
+            const confirmed = await showAppConfirm("Delete this product from the Product Master?", {
+                icon: 'delete_outline',
+                danger: true,
+                confirmLabel: 'Delete'
+            });
+            if (!confirmed) return;
+            products = products.filter(p => p.id !== id);
+            saveProducts();
+            renderProductsScreen(document.getElementById('product-search-input').value);
+        }
+
         // --- Sandboxed PDF Exporter (No Layout Clips / No Blank Output) ---
         function exportToPDF(billId) {
             const bill = bills.find(b => b.id === billId);
@@ -2323,6 +3111,18 @@
 
             const discAmt = bill.subtotal * ((bill.discount || 0) / 100);
             const taxAmt = (bill.subtotal - discAmt) * ((bill.tax || 0) / 100);
+
+            let paymentDetailsHtml = '';
+            if (bill.paymentMethod === 'Cheque') {
+                paymentDetailsHtml = `
+                    <p style="font-size: 12px; color: #64748b; margin: 0 0 2px 0; font-weight: 600;">Cheque No: ${bill.chequeNumber || 'N/A'} &nbsp;|&nbsp; Bank: ${bill.chequeBank || 'N/A'}</p>
+                    <p style="font-size: 12px; color: #64748b; margin: 0; font-weight: 600;">Cheque Date: ${bill.chequeDate ? formatDate(bill.chequeDate) : 'N/A'}</p>
+                `;
+            } else if (bill.paymentMethod === 'UPI') {
+                paymentDetailsHtml = `
+                    <p style="font-size: 12px; color: #64748b; margin: 0; font-weight: 600;">UPI Transaction ID: ${bill.upiTxnId || 'N/A'}</p>
+                `;
+            }
 
             // Construct invoice rows inside template
             let rowItemsHtml = '';
@@ -2397,6 +3197,13 @@
                                 <td style="text-align: right; padding-top: 14px; color: #063970;">₹${bill.grandTotal.toFixed(2)}</td>
                             </tr>
                         </table>
+                    </div>
+
+                    <!-- Payment Information -->
+                    <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
+                        <h3 style="font-size: 11px; font-weight: 800; color: #94a3b8; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Payment Information</h3>
+                        <p style="font-size: 13px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">Method: ${bill.paymentMethod || 'Cash'}</p>
+                        ${paymentDetailsHtml}
                     </div>
 
                     <!-- Footer Signoff -->
